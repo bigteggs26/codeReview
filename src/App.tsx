@@ -19,17 +19,22 @@ import {
 } from './utils/googleAuth';
 import { CheckCircle2, Info } from 'lucide-react';
 
-const STORAGE_KEY_SUBMISSIONS = 'codescore_portal_submissions_v1';
-const STORAGE_KEY_USERS = 'codescore_portal_users_v1';
-const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v1';
-const STORAGE_KEY_ADMIN_LIST = 'codescore_portal_admins_v1';
+const STORAGE_KEY_SUBMISSIONS = 'codescore_portal_submissions_v2';
+const STORAGE_KEY_USERS = 'codescore_portal_users_v2';
+const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v2';
+const STORAGE_KEY_ADMIN_LIST = 'codescore_portal_admins_v2';
 
 export default function App() {
   // Initialize admin list state with localStorage persistence
   const [adminList, setAdminList] = useState<AdminEntry[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ADMIN_LIST);
-      return saved ? JSON.parse(saved) : DEFAULT_ADMIN_LIST;
+      if (saved) {
+        const parsed: AdminEntry[] = JSON.parse(saved);
+        const filtered = parsed.filter((a) => !a.email.endsWith('@teamdev.internal'));
+        return filtered.length > 0 ? filtered : DEFAULT_ADMIN_LIST;
+      }
+      return DEFAULT_ADMIN_LIST;
     } catch {
       return DEFAULT_ADMIN_LIST;
     }
@@ -39,7 +44,12 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USERS);
-      return saved ? JSON.parse(saved) : INITIAL_USERS;
+      if (saved) {
+        const parsed: User[] = JSON.parse(saved);
+        const filtered = parsed.filter((u) => !u.email?.endsWith('@teamdev.internal'));
+        return filtered.length > 0 ? filtered : INITIAL_USERS;
+      }
+      return INITIAL_USERS;
     } catch {
       return INITIAL_USERS;
     }
@@ -50,8 +60,10 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const exists = users.find((u) => u.id === parsed.id || u.email === parsed.email);
-        if (exists) return exists;
+        if (!parsed.email?.endsWith('@teamdev.internal')) {
+          const exists = users.find((u) => u.id === parsed.id || u.email === parsed.email);
+          if (exists) return exists;
+        }
       }
       return users[0] || INITIAL_USERS[0];
     } catch {

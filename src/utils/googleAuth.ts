@@ -8,27 +8,11 @@ export const INITIAL_ADMINS: AdminEntry[] = [
   {
     id: 'admin-owner',
     email: PRIMARY_OWNER_EMAIL,
-    name: 'Portal Owner (Admin)',
+    name: 'bigteggs26 (Admin)',
     role: 'super_admin',
     addedAt: '2026-08-30T00:00:00Z',
     addedBy: 'System (Primary Owner)',
     isPrimaryOwner: true,
-  },
-  {
-    id: 'admin-elena',
-    email: 'elena@teamdev.internal',
-    name: 'Elena Rostova',
-    role: 'admin',
-    addedAt: '2026-08-20T00:00:00Z',
-    addedBy: PRIMARY_OWNER_EMAIL,
-  },
-  {
-    id: 'admin-marcus',
-    email: 'marcus@teamdev.internal',
-    name: 'Marcus Vance',
-    role: 'admin',
-    addedAt: '2026-08-20T00:00:00Z',
-    addedBy: PRIMARY_OWNER_EMAIL,
   },
 ];
 
