@@ -85,15 +85,19 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
         return;
       }
 
-      // Security check: Only verified Google owner can log in with owner email
-      const isSuper = email === PRIMARY_OWNER_EMAIL.toLowerCase();
+      // Security check: Only verified Google OAuth popup can access the primary Super Admin owner account
+      const isOwnerAttempt = email === PRIMARY_OWNER_EMAIL.toLowerCase();
+      if (isOwnerAttempt) {
+        setErrorMsg('The Owner / Super Admin account must sign in via "Continue with Google Account" for security.');
+        setIsProcessing(false);
+        return;
+      }
+
       const hasAdmin = isEmailAdmin(email, adminList);
 
       const name =
         nameToUse?.trim() ||
-        (isSuper
-          ? 'bigteggs26 (Super Admin)'
-          : email.split('@')[0].replace('.', ' ').replace(/^./, (str) => str.toUpperCase()));
+        email.split('@')[0].replace('.', ' ').replace(/^./, (str) => str.toUpperCase());
       const avatar =
         customAvatar.trim() ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
@@ -106,14 +110,12 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
         email: email,
         avatar: avatar,
         role: hasAdmin ? 'admin' : 'member',
-        title: isSuper
-          ? 'Super Administrator & Owner'
-          : hasAdmin
+        title: hasAdmin
           ? 'Platform Reviewer & Admin'
           : 'Software Engineer',
-        badge: isSuper ? 'Owner & Super Admin' : hasAdmin ? 'Team Admin' : 'Google Verified',
+        badge: hasAdmin ? 'Team Admin' : 'Google Verified',
         authProvider: 'google',
-        isSuperAdmin: isSuper,
+        isSuperAdmin: false,
       };
 
       onLoginSuccess(authenticatedUser);

@@ -8,7 +8,6 @@ import { TeamLeaderboard } from './components/TeamLeaderboard';
 import { SubmitModal } from './components/SubmitModal';
 import { ReviewModal } from './components/ReviewModal';
 import { SubmissionDetailModal } from './components/SubmissionDetailModal';
-import { RoleSwitcher } from './components/RoleSwitcher';
 import { GoogleLoginModal } from './components/GoogleLoginModal';
 import { AdminManagementModal } from './components/AdminManagementModal';
 import {
@@ -487,16 +486,6 @@ export default function App() {
           />
         )}
       </main>
-
-      {/* Bottom Sticky Role Switcher Bar */}
-      <RoleSwitcher
-        currentUser={currentUser}
-        allUsers={users}
-        onSelectUser={handleSelectUser}
-        onResetData={handleResetData}
-        onOpenGoogleLogin={() => setGoogleLoginModalOpen(true)}
-        onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
-      />
 
       {/* Google Login Modal */}
       {googleLoginModalOpen && (

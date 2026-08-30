@@ -268,57 +268,9 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-2 transition-colors"
                     >
                       <LogIn size={14} className="text-indigo-600" />
-                      <span>{isGoogleAuth ? 'Switch Google Account' : 'Sign in with Google Account'}</span>
+                      <span>{isGoogleAuth ? 'Switch / Sign In with Account' : 'Sign in with Google Account'}</span>
                     </button>
                   </div>
-
-                  {/* Only reviewers / admins can view the debug quick-switch, preventing unauthorized users from clicking owner account */}
-                  {isAdmin && allUsers.length > 1 && (
-                    <>
-                      <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Admin Switcher ({allUsers.length})
-                      </div>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                        {allUsers.map((u) => {
-                          const isSelected = u.id === currentUser.id;
-                          return (
-                            <button
-                              key={u.id}
-                              id={`switch-user-${u.id}`}
-                              onClick={() => onSelectUser(u)}
-                              className={`w-full text-left px-3.5 py-2 flex items-center gap-2.5 transition-colors ${
-                                isSelected
-                                  ? 'bg-indigo-50/80 text-indigo-950 font-medium'
-                                  : 'hover:bg-slate-50 text-slate-700'
-                              }`}
-                            >
-                              <img
-                                src={u.avatar}
-                                alt={u.name}
-                                className="w-6 h-6 rounded-lg object-cover ring-1 ring-slate-200 shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-xs font-bold truncate text-slate-900">
-                                    {u.name}
-                                  </p>
-                                  <span
-                                    className={`text-[8px] px-1 py-0.2 rounded uppercase font-bold tracking-wider ${
-                                      u.role === 'admin'
-                                        ? 'bg-indigo-100 text-indigo-700'
-                                        : 'bg-emerald-100 text-emerald-700'
-                                    }`}
-                                  >
-                                    {u.role}
-                                  </span>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
