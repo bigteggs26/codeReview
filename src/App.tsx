@@ -10,6 +10,7 @@ import { ReviewModal } from './components/ReviewModal';
 import { SubmissionDetailModal } from './components/SubmissionDetailModal';
 import { GoogleLoginModal } from './components/GoogleLoginModal';
 import { AdminManagementModal } from './components/AdminManagementModal';
+import { AuthGate } from './components/AuthGate';
 import {
   DEFAULT_ADMIN_LIST,
   PRIMARY_OWNER_EMAIL,
@@ -38,18 +39,19 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
-  const [currentUser, setCurrentUser] = useState<User>(() => {
+  // Require explicit login so visitors do NOT inherit the owner's Super Admin account by default
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (!parsed.email?.endsWith('@teamdev.internal')) {
+        if (parsed && parsed.email && !parsed.email.endsWith('@teamdev.internal')) {
           return parsed;
         }
       }
-      return PRIMARY_OWNER_USER;
+      return null;
     } catch {
-      return PRIMARY_OWNER_USER;
+      return null;
     }
   });
 
@@ -71,7 +73,11 @@ export default function App() {
   // Persist current session locally
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+      if (currentUser) {
+        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -87,6 +93,7 @@ export default function App() {
           setUsers(cloudUsers);
           // Keep current logged-in user in sync with updated roles/badges in cloud
           setCurrentUser((prev) => {
+            if (!prev) return null;
             const matched = cloudUsers.find(
               (u) =>
                 u.id === prev.id ||
@@ -143,6 +150,14 @@ export default function App() {
     }
   };
 
+  // Sign out user and clear storage
+  const handleSignOut = () => {
+    localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+    showToast('Signed Out', 'You have been signed out of your developer workspace.');
+  };
+
   // Google Login Success Handler
   const handleGoogleLoginSuccess = async (googleUser: User) => {
     const isAdmin = isEmailAdmin(googleUser.email, adminList);
@@ -168,7 +183,7 @@ export default function App() {
     showToast(
       `Welcome, ${updatedUser.name}!`,
       `Signed in as ${updatedUser.role.toUpperCase()}${
-        updatedUser.isSuperAdmin ? ' (Primary Owner & Super Admin)' : ''
+        updatedUser.isSuperAdmin ? ' (Super Admin)' : ''
       } • Cloud Synced`
     );
   };
@@ -194,8 +209,8 @@ export default function App() {
       console.error(e);
     }
 
-    if (currentUser.email?.toLowerCase() === email.toLowerCase()) {
-      setCurrentUser((prev) => ({ ...prev, role: 'admin' }));
+    if (currentUser?.email?.toLowerCase() === email.toLowerCase()) {
+      setCurrentUser((prev) => (prev ? { ...prev, role: 'admin' } : null));
     }
 
     showToast('Admin Authorized', `${email} now has full Reviewer & Admin privileges (Saved to Cloud).`);
@@ -217,8 +232,8 @@ export default function App() {
       console.error(e);
     }
 
-    if (currentUser.email?.toLowerCase() === email.toLowerCase()) {
-      setCurrentUser((prev) => ({ ...prev, role: 'member' }));
+    if (currentUser?.email?.toLowerCase() === email.toLowerCase()) {
+      setCurrentUser((prev) => (prev ? { ...prev, role: 'member' } : null));
     }
 
     showToast('Admin Removed', `${email} was removed from the admin whitelist.`);
@@ -237,11 +252,8 @@ export default function App() {
       console.error(e);
     }
 
-    if (currentUser.id === userId) {
-      const remaining = users.filter((u) => u.id !== userId);
-      if (remaining.length > 0) {
-        setCurrentUser(remaining[0]);
-      }
+    if (currentUser?.id === userId) {
+      handleSignOut();
     }
 
     showToast('User Deleted', `${target?.name || 'User'} removed from cloud database.`);
@@ -266,8 +278,8 @@ export default function App() {
       console.error(e);
     }
 
-    if (currentUser.id === userId) {
-      setCurrentUser((prev) => ({ ...prev, role: newRole }));
+    if (currentUser?.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, role: newRole } : null));
     }
 
     showToast('Role Updated', `${target.name} is now a ${newRole.toUpperCase()} in Cloud DB.`);
@@ -276,15 +288,15 @@ export default function App() {
   // Remove all demo users and start with clean slate in Firestore
   const handleRemoveAllUsers = async (preserveCurrentUser: boolean) => {
     const ownerUser: User = {
-      id: currentUser.id || 'user-owner',
-      name: currentUser.name || 'bigteggs26',
-      email: currentUser.email || PRIMARY_OWNER_EMAIL,
+      id: currentUser?.id || 'user-owner',
+      name: currentUser?.name || 'bigteggs26',
+      email: currentUser?.email || PRIMARY_OWNER_EMAIL,
       role: 'admin',
       isSuperAdmin: true,
-      avatar: currentUser.avatar || getAvatarUrl('bigteggs26', PRIMARY_OWNER_EMAIL),
+      avatar: currentUser?.avatar || getAvatarUrl('bigteggs26', PRIMARY_OWNER_EMAIL),
       title: 'Lead Administrator & Reviewer',
       badge: 'Super Admin',
-      authProvider: currentUser.authProvider || 'google',
+      authProvider: currentUser?.authProvider || 'google',
     };
 
     try {
@@ -433,6 +445,34 @@ export default function App() {
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
 
+  // If user is not authenticated, render the dedicated AuthGate so no unauthorized user inherits owner data
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">
+        <AuthGate
+          onLoginSuccess={handleGoogleLoginSuccess}
+          adminList={adminList}
+          isCloudConnected={isCloudConnected}
+        />
+        {toastMessage && (
+          <div className="fixed bottom-16 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-200">
+            <div className="rounded-xl bg-slate-900 text-white border border-slate-700 shadow-2xl p-4 flex items-start gap-3 max-w-sm">
+              <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
+                <CheckCircle2 size={16} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">{toastMessage.title}</p>
+                {toastMessage.desc && (
+                  <p className="text-[11px] text-slate-300 mt-0.5">{toastMessage.desc}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Navigation */}
@@ -448,6 +488,7 @@ export default function App() {
         }}
         onOpenGoogleLogin={() => setGoogleLoginModalOpen(true)}
         onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
+        onSignOut={handleSignOut}
         pendingCount={pendingCount}
         isCloudConnected={isCloudConnected}
       />
