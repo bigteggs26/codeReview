@@ -24,6 +24,7 @@ export interface User {
   authProvider?: 'google' | 'local';
   isSuperAdmin?: boolean;
   isCustomUser?: boolean;
+  lastSeenAt?: string;
 }
 
 export interface AdminEntry {

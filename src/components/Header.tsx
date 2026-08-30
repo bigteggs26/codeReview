@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, User as UserIcon, Code2, Trophy, ListOrdered, PlusCircle, Sparkles, LogIn, Settings, ShieldCheck, LogOut, UserCheck } from 'lucide-react';
+import { Shield, User as UserIcon, Code2, Trophy, ListOrdered, PlusCircle, Sparkles, LogIn, Settings, ShieldCheck, LogOut, UserCheck, Cloud, CloudOff } from 'lucide-react';
 import { User, Role } from '../types';
 import { PRIMARY_OWNER_EMAIL } from '../utils/googleAuth';
 
@@ -14,6 +14,7 @@ interface HeaderProps {
   onOpenAdminManagement: () => void;
   onSignOutGoogle?: () => void;
   pendingCount: number;
+  isCloudConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAdminManagement,
   onSignOutGoogle,
   pendingCount,
+  isCloudConnected = true,
 }) => {
   const isAdmin = currentUser.role === 'admin';
   const isSuperAdmin =
@@ -50,6 +52,21 @@ export const Header: React.FC<HeaderProps> = ({
                 </h1>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border border-slate-200 hidden xs:inline-block">
                   Portal
+                </span>
+                <span
+                  title={isCloudConnected ? 'Connected to Firebase Firestore (Realtime Sync)' : 'Reconnecting to cloud...'}
+                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    isCloudConnected
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isCloudConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`}
+                  />
+                  <span className="hidden sm:inline">{isCloudConnected ? 'Live Cloud' : 'Connecting'}</span>
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium hidden md:block">

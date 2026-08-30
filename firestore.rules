@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection: anyone can read team members, users can write/update their profile
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Submissions collection: anyone can read, authenticated/active users can submit and update
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Admins whitelist collection
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

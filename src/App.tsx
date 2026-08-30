@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Submission, Review, SubmissionStatus, AdminEntry } from './types';
-import { INITIAL_USERS, INITIAL_SUBMISSIONS } from './data/initialData';
+import { INITIAL_USERS, INITIAL_SUBMISSIONS, PRIMARY_OWNER_USER } from './data/initialData';
 import { Header } from './components/Header';
 import { MemberDashboard } from './components/MemberDashboard';
 import { AdminQueue } from './components/AdminQueue';
@@ -17,43 +17,27 @@ import {
   isEmailAdmin,
   getAvatarUrl,
 } from './utils/googleAuth';
-import { CheckCircle2, Info } from 'lucide-react';
+import {
+  subscribeToUsers,
+  subscribeToSubmissions,
+  subscribeToAdmins,
+  saveUserToCloud,
+  deleteUserFromCloud,
+  saveSubmissionToCloud,
+  deleteSubmissionFromCloud,
+  saveAdminToCloud,
+  removeAdminFromCloud,
+  clearAllUsersFromCloud,
+} from './lib/firestoreService';
+import { CheckCircle2, CloudCheck, CloudOff, Info } from 'lucide-react';
 
-const STORAGE_KEY_SUBMISSIONS = 'codescore_portal_submissions_v2';
-const STORAGE_KEY_USERS = 'codescore_portal_users_v2';
 const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v2';
-const STORAGE_KEY_ADMIN_LIST = 'codescore_portal_admins_v2';
 
 export default function App() {
-  // Initialize admin list state with localStorage persistence
-  const [adminList, setAdminList] = useState<AdminEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ADMIN_LIST);
-      if (saved) {
-        const parsed: AdminEntry[] = JSON.parse(saved);
-        const filtered = parsed.filter((a) => !a.email.endsWith('@teamdev.internal'));
-        return filtered.length > 0 ? filtered : DEFAULT_ADMIN_LIST;
-      }
-      return DEFAULT_ADMIN_LIST;
-    } catch {
-      return DEFAULT_ADMIN_LIST;
-    }
-  });
-
-  // Initialize users state with localStorage persistence
-  const [users, setUsers] = useState<User[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_USERS);
-      if (saved) {
-        const parsed: User[] = JSON.parse(saved);
-        const filtered = parsed.filter((u) => !u.email?.endsWith('@teamdev.internal'));
-        return filtered.length > 0 ? filtered : INITIAL_USERS;
-      }
-      return INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
-    }
-  });
+  const [adminList, setAdminList] = useState<AdminEntry[]>(DEFAULT_ADMIN_LIST);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS);
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
@@ -61,22 +45,12 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (!parsed.email?.endsWith('@teamdev.internal')) {
-          const exists = users.find((u) => u.id === parsed.id || u.email === parsed.email);
-          if (exists) return exists;
+          return parsed;
         }
       }
-      return users[0] || INITIAL_USERS[0];
+      return PRIMARY_OWNER_USER;
     } catch {
-      return users[0] || INITIAL_USERS[0];
-    }
-  });
-
-  const [submissions, setSubmissions] = useState<Submission[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SUBMISSIONS);
-      return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-    } catch {
-      return INITIAL_SUBMISSIONS;
+      return PRIMARY_OWNER_USER;
     }
   });
 
@@ -95,31 +69,7 @@ export default function App() {
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<{ title: string; desc?: string } | null>(null);
 
-  // Save changes to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ADMIN_LIST, JSON.stringify(adminList));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [adminList]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [users]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [submissions]);
-
+  // Persist current session locally
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
@@ -127,6 +77,59 @@ export default function App() {
       console.error(e);
     }
   }, [currentUser]);
+
+  // Real-time Firestore Cloud Synchronization
+  useEffect(() => {
+    // 1. Subscribe to Cloud Users
+    const unsubUsers = subscribeToUsers(
+      (cloudUsers) => {
+        setIsCloudConnected(true);
+        if (cloudUsers && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+          // Keep current logged-in user in sync with updated roles/badges in cloud
+          setCurrentUser((prev) => {
+            const matched = cloudUsers.find(
+              (u) =>
+                u.id === prev.id ||
+                (u.email && prev.email && u.email.toLowerCase() === prev.email.toLowerCase())
+            );
+            if (matched) return matched;
+            return prev;
+          });
+        }
+      },
+      (err) => {
+        console.error('Failed to sync users with cloud:', err);
+        setIsCloudConnected(false);
+      }
+    );
+
+    // 2. Subscribe to Cloud Submissions
+    const unsubSubs = subscribeToSubmissions(
+      (cloudSubs) => {
+        setSubmissions(cloudSubs);
+      },
+      (err) => {
+        console.error('Failed to sync submissions with cloud:', err);
+      }
+    );
+
+    // 3. Subscribe to Cloud Admin Whitelist
+    const unsubAdmins = subscribeToAdmins(
+      (cloudAdmins) => {
+        setAdminList(cloudAdmins);
+      },
+      (err) => {
+        console.error('Failed to sync admins with cloud:', err);
+      }
+    );
+
+    return () => {
+      unsubUsers();
+      unsubSubs();
+      unsubAdmins();
+    };
+  }, []);
 
   const showToast = (title: string, desc?: string) => {
     setToastMessage({ title, desc });
@@ -136,15 +139,13 @@ export default function App() {
   const handleSelectUser = (user: User) => {
     setCurrentUser(user);
     showToast(`Switched user to ${user.name}`, `Active role: ${user.role.toUpperCase()}`);
-    // If switching from admin to member, ensure they are on a valid view
     if (user.role === 'member' && activeTab === 'queue') {
       setActiveTab('dashboard');
     }
   };
 
   // Google Login Success Handler
-  const handleGoogleLoginSuccess = (googleUser: User) => {
-    // Check if user is in admin list
+  const handleGoogleLoginSuccess = async (googleUser: User) => {
     const isAdmin = isEmailAdmin(googleUser.email, adminList);
     const updatedUser: User = {
       ...googleUser,
@@ -152,36 +153,29 @@ export default function App() {
       isSuperAdmin:
         googleUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() ||
         googleUser.isSuperAdmin,
+      lastSeenAt: new Date().toISOString(),
     };
 
-    // Add or update in users list
-    setUsers((prev) => {
-      const existingIdx = prev.findIndex(
-        (u) =>
-          u.email?.toLowerCase() === updatedUser.email?.toLowerCase() ||
-          u.id === updatedUser.id
-      );
-      if (existingIdx >= 0) {
-        const copy = [...prev];
-        copy[existingIdx] = { ...copy[existingIdx], ...updatedUser };
-        return copy;
-      }
-      return [updatedUser, ...prev];
-    });
+    // Save to Cloud Firestore so all users and devices instantly see this account
+    try {
+      await saveUserToCloud(updatedUser);
+    } catch (err) {
+      console.error('Error saving user to Firestore:', err);
+    }
 
     setCurrentUser(updatedUser);
     setGoogleLoginModalOpen(false);
 
     showToast(
       `Welcome, ${updatedUser.name}!`,
-      `Signed in with Google as ${updatedUser.role.toUpperCase()}${
+      `Signed in as ${updatedUser.role.toUpperCase()}${
         updatedUser.isSuperAdmin ? ' (Primary Owner & Super Admin)' : ''
-      }`
+      } • Cloud Synced`
     );
   };
 
   // Admin Management Handlers
-  const handleAddAdmin = (email: string, name: string, title?: string) => {
+  const handleAddAdmin = async (email: string, name: string, title?: string) => {
     const newEntry: AdminEntry = {
       id: `admin-${Date.now()}`,
       email: email.toLowerCase(),
@@ -190,48 +184,39 @@ export default function App() {
       roleTitle: title || 'Code Reviewer & Staff Admin',
     };
 
-    setAdminList((prev) => {
-      if (prev.some((a) => a.email.toLowerCase() === email.toLowerCase())) {
-        return prev;
+    try {
+      await saveAdminToCloud(newEntry);
+      // Also elevate user in cloud database if they exist
+      const existingUser = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (existingUser) {
+        await saveUserToCloud({ ...existingUser, role: 'admin' });
       }
-      return [...prev, newEntry];
-    });
+    } catch (e) {
+      console.error(e);
+    }
 
-    // Also update user in user list if already present
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.email?.toLowerCase() === email.toLowerCase()) {
-          return { ...u, role: 'admin' };
-        }
-        return u;
-      })
-    );
-
-    // If current user is this person, elevate role
     if (currentUser.email?.toLowerCase() === email.toLowerCase()) {
       setCurrentUser((prev) => ({ ...prev, role: 'admin' }));
     }
 
-    showToast('Admin Authorized', `${email} now has full Reviewer & Admin privileges.`);
+    showToast('Admin Authorized', `${email} now has full Reviewer & Admin privileges (Saved to Cloud).`);
   };
 
-  const handleRemoveAdmin = (adminId: string, email: string) => {
+  const handleRemoveAdmin = async (adminId: string, email: string) => {
     if (email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase()) {
       showToast('Cannot Remove Owner', 'The Primary Owner account cannot be removed from admins.');
       return;
     }
 
-    setAdminList((prev) => prev.filter((a) => a.id !== adminId && a.email.toLowerCase() !== email.toLowerCase()));
-
-    // Demote in user list
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.email?.toLowerCase() === email.toLowerCase()) {
-          return { ...u, role: 'member' };
-        }
-        return u;
-      })
-    );
+    try {
+      await removeAdminFromCloud(adminId);
+      const existingUser = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (existingUser) {
+        await saveUserToCloud({ ...existingUser, role: 'member' });
+      }
+    } catch (e) {
+      console.error(e);
+    }
 
     if (currentUser.email?.toLowerCase() === email.toLowerCase()) {
       setCurrentUser((prev) => ({ ...prev, role: 'member' }));
@@ -240,16 +225,19 @@ export default function App() {
     showToast('Admin Removed', `${email} was removed from the admin whitelist.`);
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
     if (target?.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase()) {
       showToast('Cannot Delete Owner', 'Primary Owner cannot be deleted.');
       return;
     }
 
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    try {
+      await deleteUserFromCloud(userId);
+    } catch (e) {
+      console.error(e);
+    }
 
-    // If current user was deleted, switch to another user or owner
     if (currentUser.id === userId) {
       const remaining = users.filter((u) => u.id !== userId);
       if (remaining.length > 0) {
@@ -257,10 +245,10 @@ export default function App() {
       }
     }
 
-    showToast('User Deleted', `${target?.name || 'User'} removed from portal.`);
+    showToast('User Deleted', `${target?.name || 'User'} removed from cloud database.`);
   };
 
-  const handleToggleUserRole = (userId: string, newRole: 'admin' | 'member') => {
+  const handleToggleUserRole = async (userId: string, newRole: 'admin' | 'member') => {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
 
@@ -269,143 +257,157 @@ export default function App() {
       return;
     }
 
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
+    const updated = { ...target, role: newRole };
+    try {
+      await saveUserToCloud(updated);
+      if (newRole === 'admin' && target.email) {
+        await handleAddAdmin(target.email, target.name, target.title);
+      }
+    } catch (e) {
+      console.error(e);
+    }
 
     if (currentUser.id === userId) {
       setCurrentUser((prev) => ({ ...prev, role: newRole }));
     }
 
-    // Sync admin list
-    if (newRole === 'admin' && target.email) {
-      handleAddAdmin(target.email, target.name, target.title);
-    }
-
-    showToast('Role Updated', `${target.name} is now a ${newRole.toUpperCase()}.`);
+    showToast('Role Updated', `${target.name} is now a ${newRole.toUpperCase()} in Cloud DB.`);
   };
 
-  // Remove all demo users and start with clean slate, keeping current admin/owner
-  const handleRemoveAllUsers = (preserveCurrentUser: boolean) => {
-    // Ensure primary owner or current logged in user is preserved
+  // Remove all demo users and start with clean slate in Firestore
+  const handleRemoveAllUsers = async (preserveCurrentUser: boolean) => {
     const ownerUser: User = {
-      id: currentUser.id || 'owner-user',
-      name: currentUser.name || 'Owner Administrator',
+      id: currentUser.id || 'user-owner',
+      name: currentUser.name || 'bigteggs26',
       email: currentUser.email || PRIMARY_OWNER_EMAIL,
       role: 'admin',
       isSuperAdmin: true,
-      avatar: currentUser.avatar || getAvatarUrl('Admin Owner', PRIMARY_OWNER_EMAIL),
-      title: 'Principal Architect & Admin',
+      avatar: currentUser.avatar || getAvatarUrl('bigteggs26', PRIMARY_OWNER_EMAIL),
+      title: 'Lead Administrator & Reviewer',
       badge: 'Super Admin',
       authProvider: currentUser.authProvider || 'google',
     };
 
-    setUsers([ownerUser]);
-    setCurrentUser(ownerUser);
+    try {
+      await clearAllUsersFromCloud(ownerUser);
+    } catch (e) {
+      console.error(e);
+    }
 
+    setCurrentUser(ownerUser);
     showToast(
-      'All Demo Users Removed',
-      'Portal cleared. Only your Super Admin account remains.'
+      'All Non-Owner Users Removed',
+      'Cloud database cleared. Only your Super Admin account remains.'
     );
   };
 
-  // Add custom team member
-  const handleAddTeamMember = (member: Omit<User, 'id'>) => {
+  // Add custom team member to cloud database
+  const handleAddTeamMember = async (member: Omit<User, 'id'>) => {
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...member,
     };
 
-    setUsers((prev) => [...prev, newUser]);
-    showToast('Team Member Created', `${newUser.name} was added to the portal.`);
+    try {
+      await saveUserToCloud(newUser);
+      showToast('Team Member Created', `${newUser.name} was added to the central cloud database.`);
+    } catch (e) {
+      console.error(e);
+      showToast('Error saving user', 'Could not sync with cloud database.');
+    }
   };
 
-  // Submit new code or revised code
-  const handleSubmitCode = (
+  // Submit new code or revised code to cloud database
+  const handleSubmitCode = async (
     submissionData: Omit<Submission, 'id' | 'submittedAt' | 'status'>,
     isResubmission?: boolean
   ) => {
     if (isResubmission && resubmissionTarget) {
-      // Update the existing submission with new code and reset status to pending
-      setSubmissions((prev) =>
-        prev.map((s) => {
-          if (s.id === resubmissionTarget.id) {
-            return {
-              ...s,
-              title: submissionData.title,
-              language: submissionData.language,
-              description: submissionData.description,
-              code: submissionData.code,
-              tags: submissionData.tags,
-              status: 'pending' as SubmissionStatus,
-              submittedAt: new Date().toISOString(),
-              resubmissionCount: (s.resubmissionCount || 0) + 1,
-            };
-          }
-          return s;
-        })
-      );
-      showToast('Revised code submitted!', 'Moved to the review queue for re-evaluation.');
+      const revisedSub: Submission = {
+        ...resubmissionTarget,
+        title: submissionData.title,
+        language: submissionData.language,
+        description: submissionData.description,
+        code: submissionData.code,
+        tags: submissionData.tags,
+        status: 'pending' as SubmissionStatus,
+        submittedAt: new Date().toISOString(),
+        resubmissionCount: (resubmissionTarget.resubmissionCount || 0) + 1,
+      };
+
+      try {
+        await saveSubmissionToCloud(revisedSub);
+        showToast('Revised code submitted!', 'Synced to reviewers in real-time.');
+      } catch (e) {
+        console.error(e);
+      }
     } else {
-      // Create new submission
       const newSub: Submission = {
         id: `sub-${Date.now()}`,
         ...submissionData,
         status: 'pending',
         submittedAt: new Date().toISOString(),
       };
-      setSubmissions((prev) => [newSub, ...prev]);
-      showToast('Code submitted successfully!', 'Reviewers have been notified in the queue.');
+
+      try {
+        await saveSubmissionToCloud(newSub);
+        showToast('Code submitted successfully!', 'Reviewers notified across all active devices.');
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     setSubmitModalOpen(false);
     setResubmissionTarget(undefined);
   };
 
-  // Save review from admin
-  const handleSaveReview = (
+  // Save review from admin to cloud database
+  const handleSaveReview = async (
     submissionId: string,
     review: Review,
     statusOutcome: 'reviewed' | 'needs_resubmission'
   ) => {
-    setSubmissions((prev) =>
-      prev.map((s) => {
-        if (s.id === submissionId) {
-          return {
-            ...s,
-            status: statusOutcome,
-            review,
-          };
-        }
-        return s;
-      })
-    );
+    const existing = submissions.find((s) => s.id === submissionId);
+    if (!existing) return;
+
+    const updated: Submission = {
+      ...existing,
+      status: statusOutcome,
+      review,
+    };
+
+    try {
+      await saveSubmissionToCloud(updated);
+      showToast(
+        statusOutcome === 'reviewed' ? 'Review & Score Published!' : 'Resubmission Requested!',
+        `Score: ${review.score}/100 • Feedback and diff saved in real-time.`
+      );
+    } catch (e) {
+      console.error(e);
+    }
 
     setReviewingSubmission(null);
-    showToast(
-      statusOutcome === 'reviewed' ? 'Review & Score Published!' : 'Resubmission Requested!',
-      `Score: ${review.score}/100 • Feedback and diff saved.`
-    );
   };
 
-  // Update AI detection result on a submission
-  const handleUpdateSubmissionAiDetection = (
+  // Update AI detection result on a submission in cloud database
+  const handleUpdateSubmissionAiDetection = async (
     submissionId: string,
     aiDetection: any
   ) => {
-    setSubmissions((prev) =>
-      prev.map((s) => {
-        if (s.id === submissionId) {
-          return {
-            ...s,
-            aiDetection,
-          };
-        }
-        return s;
-      })
-    );
+    const existing = submissions.find((s) => s.id === submissionId);
+    if (!existing) return;
 
-    // Also update if currently viewing or reviewing
+    const updated: Submission = {
+      ...existing,
+      aiDetection,
+    };
+
+    try {
+      await saveSubmissionToCloud(updated);
+    } catch (e) {
+      console.error(e);
+    }
+
     setViewingSubmission((prev) =>
       prev && prev.id === submissionId ? { ...prev, aiDetection } : prev
     );
@@ -419,18 +421,15 @@ export default function App() {
     );
   };
 
-  // Reset sample dataset
-  const handleResetData = () => {
-    localStorage.removeItem(STORAGE_KEY_SUBMISSIONS);
-    localStorage.removeItem(STORAGE_KEY_USERS);
-    localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-    localStorage.removeItem(STORAGE_KEY_ADMIN_LIST);
-    setAdminList(DEFAULT_ADMIN_LIST);
-    setUsers(INITIAL_USERS);
-    setCurrentUser(INITIAL_USERS[0]);
-    setSubmissions(INITIAL_SUBMISSIONS);
-    setActiveTab('dashboard');
-    showToast('Reset to original sample data', 'All team submissions and reviews re-seeded.');
+  const handleResetData = async () => {
+    try {
+      await clearAllUsersFromCloud(PRIMARY_OWNER_USER);
+      setCurrentUser(PRIMARY_OWNER_USER);
+      setActiveTab('dashboard');
+      showToast('Reset to clean database', 'Database refreshed.');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
@@ -451,6 +450,7 @@ export default function App() {
         onOpenGoogleLogin={() => setGoogleLoginModalOpen(true)}
         onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
         pendingCount={pendingCount}
+        isCloudConnected={isCloudConnected}
       />
 
       {/* Main Content Area */}

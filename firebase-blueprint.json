@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role, email, and activity timestamp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "isSuperAdmin": { "type": "boolean" },
+        "avatar": { "type": "string" },
+        "title": { "type": "string" },
+        "badge": { "type": "string" },
+        "authProvider": { "type": "string" },
+        "lastSeenAt": { "type": "string" }
+      },
+      "required": ["id", "name", "role", "email"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Code submission for peer/admin review with rubric scoring",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "memberAvatar": { "type": "string" },
+        "memberEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "language": { "type": "string" },
+        "code": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "status": { "type": "string" },
+        "rubricScores": { "type": "object" },
+        "totalScore": { "type": "number" },
+        "finalFeedback": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewedByName": { "type": "string" },
+        "reviewedAt": { "type": "string" }
+      },
+      "required": ["id", "memberId", "memberName", "title", "code", "language", "submittedAt", "status"]
+    },
+    "AdminEntry": {
+      "title": "AdminEntry",
+      "description": "Authorized reviewer email and access details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "roleTitle": { "type": "string" },
+        "addedAt": { "type": "string" },
+        "addedBy": { "type": "string" },
+        "isPrimaryOwner": { "type": "boolean" }
+      },
+      "required": ["id", "email", "name"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "entity": "User",
+      "description": "Collection of team members and logged-in users"
+    },
+    "submissions": {
+      "entity": "Submission",
+      "description": "Collection of submitted code reviews and scores"
+    },
+    "admins": {
+      "entity": "AdminEntry",
+      "description": "Collection of authorized admin reviewers"
+    }
+  }
+}
