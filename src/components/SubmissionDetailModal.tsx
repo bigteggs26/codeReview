@@ -170,14 +170,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center space-x-2">
+        {/* Navigation Tabs - responsive horizontal scrolling for mobile */}
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 overflow-x-auto no-scrollbar">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto w-full sm:w-auto shrink-0 pb-1 sm:pb-0">
             {review && (
               <button
                 id="tab-diff-view-btn"
                 onClick={() => setActiveTab('diff')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                   activeTab === 'diff'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -191,7 +191,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             <button
               id="tab-original-code-btn"
               onClick={() => setActiveTab('original')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === 'original'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -205,7 +205,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <button
                 id="tab-rubric-card-btn"
                 onClick={() => setActiveTab('rubric')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                   activeTab === 'rubric'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -219,7 +219,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             <button
               id="tab-ai-detector-btn"
               onClick={() => setActiveTab('ai_detector')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === 'ai_detector'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -235,7 +235,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             </button>
           </div>
 
-          <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
+          <div className="text-xs text-slate-500 font-medium flex items-center gap-2 shrink-0">
             <Calendar size={13} />
             <span>Submitted {dateStr}</span>
           </div>

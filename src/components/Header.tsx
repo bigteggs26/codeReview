@@ -75,33 +75,35 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/80">
+          {/* Navigation Tabs - responsive scroll on small screens */}
+          <nav className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 overflow-x-auto max-w-[50vw] sm:max-w-none shrink-0 no-scrollbar">
             <button
               id="nav-tab-dashboard"
               onClick={() => onSelectTab('dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === 'dashboard'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               <UserIcon size={14} />
-              <span>{isAdmin ? 'Reviewer Desk' : 'My Submissions'}</span>
+              <span className="hidden sm:inline">{isAdmin ? 'Reviewer Desk' : 'My Submissions'}</span>
+              <span className="sm:hidden">{isAdmin ? 'Reviews' : 'Mine'}</span>
             </button>
 
             {isAdmin && (
               <button
                 id="nav-tab-queue"
                 onClick={() => onSelectTab('queue')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all relative ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 relative ${
                   activeTab === 'queue'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
                 <ListOrdered size={14} />
-                <span>Review Queue</span>
+                <span className="hidden sm:inline">Review Queue</span>
+                <span className="sm:hidden">Queue</span>
                 {pendingCount > 0 && (
                   <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[10px] rounded-full">
                     {pendingCount}
@@ -113,41 +115,43 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="nav-tab-leaderboard"
               onClick={() => onSelectTab('leaderboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === 'leaderboard'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               <Trophy size={14} />
-              <span>Leaderboard</span>
+              <span className="hidden sm:inline">Leaderboard</span>
+              <span className="sm:hidden">Ranks</span>
             </button>
           </nav>
 
           {/* Right Action & User Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Submit Code button - visible on small & large */}
+            <button
+              id="header-submit-code-btn"
+              onClick={onOpenSubmitModal}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <PlusCircle size={14} />
+              <span className="hidden sm:inline">Submit Code</span>
+              <span className="sm:hidden">Submit</span>
+            </button>
+
             {/* Admin Management / Access Controls button */}
             {isAdmin && (
               <button
                 id="header-admin-mgmt-btn"
                 onClick={onOpenAdminManagement}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors"
                 title="Manage Admins & Team Directory"
               >
                 <ShieldCheck size={14} className="text-indigo-600" />
                 <span className="hidden sm:inline">Admin Controls</span>
               </button>
             )}
-
-            {/* Submit Code button */}
-            <button
-              id="header-submit-code-btn"
-              onClick={onOpenSubmitModal}
-              className="hidden lg:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <PlusCircle size={14} />
-              <span>Submit Code</span>
-            </button>
 
             {/* Google Login Trigger or Current User Pill */}
             {!isGoogleAuth ? (
@@ -268,10 +272,11 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   </div>
 
-                  {allUsers.length > 0 && (
+                  {/* Only reviewers / admins can view the debug quick-switch, preventing unauthorized users from clicking owner account */}
+                  {isAdmin && allUsers.length > 1 && (
                     <>
                       <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Switch Active Profile ({allUsers.length})
+                        Admin Switcher ({allUsers.length})
                       </div>
                       <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
                         {allUsers.map((u) => {
