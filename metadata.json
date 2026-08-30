@@ -1,0 +1,6 @@
+{
+  "name": "Code Review & Scoring Portal",
+  "description": "A collaborative code review and scoring portal for small development teams featuring role-based workflows, rubric scoring, side-by-side diffs, member dashboards, and team leaderboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
