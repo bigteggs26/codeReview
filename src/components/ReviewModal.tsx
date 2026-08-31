@@ -14,13 +14,16 @@ import {
   Trash2,
   HelpCircle,
   ArrowRight,
-  Bot
+  Bot,
+  Eye,
+  Monitor
 } from 'lucide-react';
 import { Submission, User, RubricScores, Review } from '../types';
 import { CodeEditor } from './CodeEditor';
 import { DiffViewer } from './DiffViewer';
 import { AiDetectorBadge } from './AiDetectorBadge';
 import { AiDetectorCard } from './AiDetectorCard';
+import { CodeLivePreview, isRenderableCode } from './CodeLivePreview';
 
 interface ReviewModalProps {
   submission: Submission;
@@ -38,6 +41,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   onUpdateSubmissionAiDetection,
 }) => {
   const existing = submission.review;
+  const isWebCode = isRenderableCode(submission.code, submission.language);
 
   const [correctness, setCorrectness] = useState<number>(
     existing?.rubric?.correctness ?? 35
@@ -67,11 +71,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     existing?.statusOutcome ?? 'reviewed'
   );
 
-  const [activeTab, setActiveTab] = useState<'editor' | 'diff'>('editor');
+  const [originalViewMode, setOriginalViewMode] = useState<'code' | 'preview'>('code');
+  const [activeTab, setActiveTab] = useState<'editor' | 'diff' | 'preview'>('editor');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [showAiCard, setShowAiCard] = useState(false);
   const [isScanningAi, setIsScanningAi] = useState(false);
+
 
   // Total score calculation
   const totalScore = Math.min(100, Math.max(0, correctness + style + efficiency));
@@ -328,23 +334,67 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             </div>
           </div>
 
-          {/* Original Code View */}
+          {/* Original Code View with Live Preview Toggle */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <FileCode size={14} className="text-indigo-600" />
-                Submitted Code (Original)
-              </label>
-              <span className="text-[11px] text-slate-400 font-medium">Read-only reference</span>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileCode size={14} className="text-indigo-600" />
+                  Submitted Code (Original)
+                </label>
+                {isWebCode && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Web UI
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setOriginalViewMode('code')}
+                  className={`px-2.5 py-0.5 rounded font-bold transition-colors ${
+                    originalViewMode === 'code'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOriginalViewMode('preview')}
+                  className={`px-2.5 py-0.5 rounded font-bold transition-colors flex items-center gap-1 ${
+                    originalViewMode === 'preview'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-indigo-600'
+                  }`}
+                >
+                  <Eye size={12} />
+                  <span>Live Result</span>
+                </button>
+              </div>
             </div>
-            <CodeEditor
-              value={submission.code}
-              language={submission.language}
-              readOnly={true}
-              minHeight="min-h-[160px]"
-              maxHeight="max-h-[260px]"
-              idPrefix="original-code"
-            />
+
+            {originalViewMode === 'code' ? (
+              <CodeEditor
+                value={submission.code}
+                language={submission.language}
+                readOnly={true}
+                minHeight="min-h-[160px]"
+                maxHeight="max-h-[260px]"
+                idPrefix="original-code"
+              />
+            ) : (
+              <CodeLivePreview
+                code={submission.code}
+                language={submission.language}
+                title={`Original Output: ${submission.title}`}
+                minHeight="min-h-[220px]"
+                maxHeight="max-h-[340px]"
+              />
+            )}
           </div>
 
           {/* Scoring Rubric Section */}
@@ -533,7 +583,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             </div>
           </div>
 
-          {/* Corrected Version & Live Diff Preview */}
+          {/* Corrected Version & Live Diff / Result Preview */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -564,6 +614,18 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                   >
                     Live Diff Preview
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview')}
+                    className={`px-2.5 py-0.5 rounded font-bold transition-colors flex items-center gap-1 ${
+                      activeTab === 'preview'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-indigo-600'
+                    }`}
+                  >
+                    <Eye size={12} />
+                    <span>Live Result</span>
+                  </button>
                 </div>
               </div>
 
@@ -578,7 +640,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
               </button>
             </div>
 
-            {activeTab === 'editor' ? (
+            {activeTab === 'editor' && (
               <CodeEditor
                 value={correctedCode}
                 onChange={setCorrectedCode}
@@ -588,12 +650,24 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 placeholder="Paste or refine the corrected, production-ready code snippet..."
                 idPrefix="corrected-code"
               />
-            ) : (
+            )}
+
+            {activeTab === 'diff' && (
               <DiffViewer
                 originalCode={submission.code}
                 correctedCode={correctedCode}
                 language={submission.language}
                 maxHeight="max-h-[360px]"
+              />
+            )}
+
+            {activeTab === 'preview' && (
+              <CodeLivePreview
+                code={correctedCode}
+                language={submission.language}
+                title={`Corrected Live Result: ${submission.title}`}
+                minHeight="min-h-[260px]"
+                maxHeight="max-h-[380px]"
               />
             )}
           </div>

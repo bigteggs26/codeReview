@@ -15,13 +15,16 @@ import {
   Copy,
   Check,
   Bot,
-  Sparkles
+  Sparkles,
+  Eye,
+  Monitor
 } from 'lucide-react';
 import { Submission, User, SubmissionStatus } from '../types';
 import { DiffViewer } from './DiffViewer';
 import { CodeEditor } from './CodeEditor';
 import { AiDetectorCard } from './AiDetectorCard';
 import { AiDetectorBadge } from './AiDetectorBadge';
+import { CodeLivePreview, isRenderableCode } from './CodeLivePreview';
 
 interface SubmissionDetailModalProps {
   submission: Submission;
@@ -40,13 +43,18 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   onOpenReviewModal,
   onUpdateSubmissionAiDetection,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diff' | 'original' | 'rubric' | 'ai_detector'>(
-    submission.review ? 'diff' : 'original'
+  const isWebCode = isRenderableCode(submission.code, submission.language);
+  const review = submission.review;
+  
+  const [activeTab, setActiveTab] = useState<'preview' | 'diff' | 'original' | 'rubric' | 'ai_detector'>(
+    isWebCode ? 'preview' : (submission.review ? 'diff' : 'original')
+  );
+  const [previewVersion, setPreviewVersion] = useState<'original' | 'corrected'>(
+    review?.correctedCode ? 'corrected' : 'original'
   );
   const [copiedLink, setCopiedLink] = useState(false);
   const [isScanningAi, setIsScanningAi] = useState(false);
 
-  const review = submission.review;
   const isOwner = currentUser.id === submission.memberId;
   const isAdmin = currentUser.role === 'admin';
 
@@ -173,6 +181,23 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         {/* Navigation Tabs - responsive horizontal scrolling for mobile */}
         <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 overflow-x-auto no-scrollbar">
           <div className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto w-full sm:w-auto shrink-0 pb-1 sm:pb-0">
+            {/* Live Web Result Tab */}
+            <button
+              id="tab-live-preview-btn"
+              onClick={() => setActiveTab('preview')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'preview'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Eye size={14} />
+              <span>Live Result Preview</span>
+              {isWebCode && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+            </button>
+
             {review && (
               <button
                 id="tab-diff-view-btn"
@@ -198,7 +223,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               }`}
             >
               <Code size={14} />
-              <span>Original Code</span>
+              <span>Code Source</span>
             </button>
 
             {review && (
@@ -322,6 +347,60 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Tab 0: Live Visual Preview */}
+          {activeTab === 'preview' && (
+            <div className="space-y-3">
+              {review?.correctedCode && (
+                <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-indigo-600" />
+                    Preview Target:
+                  </span>
+                  <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewVersion('original')}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                        previewVersion === 'original'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Original Submitted UI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewVersion('corrected')}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                        previewVersion === 'corrected'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Reviewer Corrected UI ✨
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <CodeLivePreview
+                code={
+                  review?.correctedCode && previewVersion === 'corrected'
+                    ? review.correctedCode
+                    : submission.code
+                }
+                language={submission.language}
+                title={
+                  review?.correctedCode && previewVersion === 'corrected'
+                    ? `Reviewer Corrected Output: ${submission.title}`
+                    : `Live Result: ${submission.title}`
+                }
+                minHeight="min-h-[380px]"
+                maxHeight="max-h-[520px]"
+              />
             </div>
           )}
 

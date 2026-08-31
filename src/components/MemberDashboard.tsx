@@ -27,6 +27,7 @@ import {
   GitPullRequest
 } from 'lucide-react';
 import { Submission, User, SubmissionStatus } from '../types';
+import { isRenderableCode } from './CodeLivePreview';
 
 interface MemberDashboardProps {
   currentUser: User;
@@ -450,6 +451,17 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                         {sub.title}
                       </h4>
                       {getStatusBadge(sub.status)}
+
+                      {isRenderableCode(sub.code, sub.language) && (
+                        <span
+                          title="Interactive Live Result Preview Available"
+                          className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          onClick={() => onViewSubmission(sub)}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live UI
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-600 mt-1.5 line-clamp-2">
