@@ -8,7 +8,8 @@ import { TeamLeaderboard } from './components/TeamLeaderboard';
 import { SubmitModal } from './components/SubmitModal';
 import { ReviewModal } from './components/ReviewModal';
 import { SubmissionDetailModal } from './components/SubmissionDetailModal';
-import { GoogleLoginModal } from './components/GoogleLoginModal';
+import { AuthModal } from './components/AuthModal';
+import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { AdminManagementModal } from './components/AdminManagementModal';
 import { AuthGate } from './components/AuthGate';
 import {
@@ -29,6 +30,9 @@ import {
   removeAdminFromCloud,
   clearAllUsersFromCloud,
 } from './lib/firestoreService';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { signOutUser, formatFirebaseUser } from './lib/authService';
 import { CheckCircle2, CloudCheck, CloudOff, Info } from 'lucide-react';
 
 const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v2';
@@ -64,7 +68,8 @@ export default function App() {
   const [reviewingSubmission, setReviewingSubmission] = useState<Submission | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<Submission | null>(null);
 
-  const [googleLoginModalOpen, setGoogleLoginModalOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [adminManagementModalOpen, setAdminManagementModalOpen] = useState(false);
 
   // Toast notifications
@@ -83,6 +88,23 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Listen to Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const appUser = formatFirebaseUser(firebaseUser, adminList);
+        setCurrentUser(appUser);
+        try {
+          await saveUserToCloud(appUser);
+        } catch (e) {
+          console.error('Error saving user on auth state change:', e);
+        }
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, [adminList]);
+
   // Real-time Firestore Cloud Synchronization
   useEffect(() => {
     // 1. Subscribe to Cloud Users
@@ -99,7 +121,7 @@ export default function App() {
                 u.id === prev.id ||
                 (u.email && prev.email && u.email.toLowerCase() === prev.email.toLowerCase())
             );
-            if (matched) return matched;
+            if (matched) return { ...prev, ...matched };
             return prev;
           });
         }
@@ -151,22 +173,27 @@ export default function App() {
   };
 
   // Sign out user and clear storage
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try {
+      await signOutUser();
+    } catch (e) {
+      console.warn('Sign out notice:', e);
+    }
     localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
     setCurrentUser(null);
     setActiveTab('dashboard');
     showToast('Signed Out', 'You have been signed out of your developer workspace.');
   };
 
-  // Google Login Success Handler
-  const handleGoogleLoginSuccess = async (googleUser: User) => {
-    const isAdmin = isEmailAdmin(googleUser.email, adminList);
+  // Login Success Handler (Email/Password or Google)
+  const handleLoginSuccess = async (authUser: User) => {
+    const isAdmin = isEmailAdmin(authUser.email, adminList);
     const updatedUser: User = {
-      ...googleUser,
+      ...authUser,
       role: isAdmin ? 'admin' : 'member',
       isSuperAdmin:
-        googleUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() ||
-        googleUser.isSuperAdmin,
+        authUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() ||
+        authUser.isSuperAdmin,
       lastSeenAt: new Date().toISOString(),
     };
 
@@ -178,7 +205,7 @@ export default function App() {
     }
 
     setCurrentUser(updatedUser);
-    setGoogleLoginModalOpen(false);
+    setAuthModalOpen(false);
 
     showToast(
       `Welcome, ${updatedUser.name}!`,
@@ -450,7 +477,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">
         <AuthGate
-          onLoginSuccess={handleGoogleLoginSuccess}
+          onLoginSuccess={handleLoginSuccess}
           adminList={adminList}
           isCloudConnected={isCloudConnected}
         />
@@ -486,11 +513,24 @@ export default function App() {
           setResubmissionTarget(undefined);
           setSubmitModalOpen(true);
         }}
-        onOpenGoogleLogin={() => setGoogleLoginModalOpen(true)}
+        onOpenAuthModal={(mode = 'signin') => {
+          setAuthModalMode(mode);
+          setAuthModalOpen(true);
+        }}
         onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
         onSignOut={handleSignOut}
         pendingCount={pendingCount}
         isCloudConnected={isCloudConnected}
+      />
+
+      {/* Email Verification Alert Banner (if logged in with unverified password account) */}
+      <EmailVerificationBanner
+        currentUser={currentUser}
+        onUserUpdated={(updated) => {
+          setCurrentUser(updated);
+          showToast('Email Verified!', 'Your account email has been confirmed.');
+        }}
+        onSignOut={handleSignOut}
       />
 
       {/* Main Content Area */}
@@ -528,11 +568,12 @@ export default function App() {
         )}
       </main>
 
-      {/* Google Login Modal */}
-      {googleLoginModalOpen && (
-        <GoogleLoginModal
-          onClose={() => setGoogleLoginModalOpen(false)}
-          onLoginSuccess={handleGoogleLoginSuccess}
+      {/* Authentication Modal (Sign In / Sign Up / Reset Password / Google) */}
+      {authModalOpen && (
+        <AuthModal
+          initialMode={authModalMode}
+          onClose={() => setAuthModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
           adminList={adminList}
         />
       )}

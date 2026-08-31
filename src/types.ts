@@ -21,7 +21,8 @@ export interface User {
   avatar: string;
   title: string;
   badge?: string;
-  authProvider?: 'google' | 'local';
+  authProvider?: 'google' | 'password' | 'local';
+  emailVerified?: boolean;
   isSuperAdmin?: boolean;
   isCustomUser?: boolean;
   lastSeenAt?: string;

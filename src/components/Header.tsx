@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, User as UserIcon, Code2, Trophy, ListOrdered, PlusCircle, Sparkles, LogIn, Settings, ShieldCheck, LogOut, UserCheck, Cloud, CloudOff } from 'lucide-react';
+import { Shield, User as UserIcon, Code2, Trophy, ListOrdered, PlusCircle, Sparkles, LogIn, Settings, ShieldCheck, LogOut, UserCheck, Cloud, CloudOff, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
 import { User, Role } from '../types';
 import { PRIMARY_OWNER_EMAIL } from '../utils/googleAuth';
 
@@ -10,7 +10,7 @@ interface HeaderProps {
   activeTab: 'dashboard' | 'queue' | 'leaderboard';
   onSelectTab: (tab: 'dashboard' | 'queue' | 'leaderboard') => void;
   onOpenSubmitModal: () => void;
-  onOpenGoogleLogin: () => void;
+  onOpenAuthModal: (mode?: 'signin' | 'signup') => void;
   onOpenAdminManagement: () => void;
   onSignOut?: () => void;
   pendingCount: number;
@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
   onOpenSubmitModal,
-  onOpenGoogleLogin,
+  onOpenAuthModal,
   onOpenAdminManagement,
   onSignOut,
   pendingCount,
@@ -35,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
     Boolean(currentUser?.isSuperAdmin) ||
     currentUser?.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
   const isGoogleAuth = currentUser?.authProvider === 'google';
+  const isEmailVerified = currentUser?.emailVerified || isGoogleAuth;
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-xs">
@@ -154,15 +155,24 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {!currentUser ? (
-              /* If not logged in, show Sign In button */
-              <button
-                id="header-login-btn"
-                onClick={onOpenGoogleLogin}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-all"
-              >
-                <LogIn size={14} />
-                <span>Sign In</span>
-              </button>
+              /* If not logged in, show Sign In & Sign Up buttons */
+              <div className="flex items-center gap-2">
+                <button
+                  id="header-login-btn"
+                  onClick={() => onOpenAuthModal('signin')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-all"
+                >
+                  <LogIn size={14} />
+                  <span>Sign In</span>
+                </button>
+                <button
+                  id="header-signup-btn"
+                  onClick={() => onOpenAuthModal('signup')}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all"
+                >
+                  <span>Sign Up</span>
+                </button>
+              </div>
             ) : (
               /* User Profile & Menu */
               <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
@@ -175,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
                         className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200"
                       />
                       {isGoogleAuth && (
-                        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-white rounded-full p-0.5 shadow-xs flex items-center justify-center border border-slate-200">
+                        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-white rounded-full p-0.5 shadow-xs flex items-center justify-center border border-slate-200" title="Google Authenticated">
                           <svg className="w-full h-full" viewBox="0 0 24 24">
                             <path
                               fill="#4285F4"
@@ -210,8 +220,20 @@ export const Header: React.FC<HeaderProps> = ({
                           {isSuperAdmin ? 'Super Admin' : isAdmin ? 'Admin' : 'Member'}
                         </span>
                       </div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-[120px]">
-                        {currentUser.email || currentUser.title}
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500 truncate max-w-[140px]">
+                        {isEmailVerified ? (
+                          <span className="text-emerald-600 flex items-center gap-0.5 font-medium">
+                            <CheckCircle2 size={10} />
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 flex items-center gap-0.5 font-medium">
+                            <AlertCircle size={10} />
+                            Unverified
+                          </span>
+                        )}
+                        <span>•</span>
+                        <span className="truncate">{currentUser.email || currentUser.title}</span>
                       </div>
                     </div>
                   </div>
@@ -225,11 +247,24 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="text-[11px] text-slate-500 font-mono truncate">
                         {currentUser.email || 'Local User'}
                       </div>
-                      {isSuperAdmin && (
-                        <span className="inline-block mt-1 text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
-                          Primary Owner & Super Admin
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {isSuperAdmin && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
+                            Super Admin
+                          </span>
+                        )}
+                        {isEmailVerified ? (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                            <CheckCircle2 size={9} />
+                            Email Verified
+                          </span>
+                        ) : (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-amber-100 text-amber-800 inline-flex items-center gap-1">
+                            <AlertCircle size={9} />
+                            Verify Email
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {isAdmin && (
@@ -246,11 +281,11 @@ export const Header: React.FC<HeaderProps> = ({
 
                     <div className="p-1 border-b border-slate-100">
                       <button
-                        onClick={onOpenGoogleLogin}
+                        onClick={() => onOpenAuthModal('signin')}
                         className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-2 transition-colors"
                       >
                         <LogIn size={14} className="text-indigo-600" />
-                        <span>Switch Account</span>
+                        <span>Switch or Add Account</span>
                       </button>
                     </div>
 
@@ -276,4 +311,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
 
