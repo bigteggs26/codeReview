@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Submission, User, SubmissionStatus } from '../types';
 import { isRenderableCode } from './CodeLivePreview';
+import { LanguageBadge } from './LanguageBadge';
 
 interface MemberDashboardProps {
   currentUser: User;
@@ -444,9 +445,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-bold">
-                        {sub.language}
-                      </span>
+                      <LanguageBadge language={sub.language} size="xs" />
                       <h4 className="text-sm font-bold text-slate-900 truncate max-w-md">
                         {sub.title}
                       </h4>

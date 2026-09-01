@@ -551,10 +551,10 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-extrabold text-rose-900">
-                    Remove All Users / Clear Demo Users
+                    Remove All Non-Owner Users
                   </h4>
                   <p className="text-xs text-rose-700 mt-1 leading-relaxed">
-                    This action will purge all placeholder demo users (Elena, Marcus, Alex, Priya, Devon, Kaito) and leave only your authenticated Google Administrator account (<strong className="font-bold">{PRIMARY_OWNER_EMAIL}</strong>).
+                    This action will purge all non-owner member accounts and leave only your authenticated Administrator account (<strong className="font-bold">{PRIMARY_OWNER_EMAIL}</strong>).
                   </p>
                 </div>
               </div>
@@ -564,8 +564,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   What happens when you click "Remove All Users":
                 </p>
                 <ul className="text-xs text-slate-600 list-disc list-inside space-y-1">
-                  <li>All sample mock accounts are permanently removed.</li>
-                  <li>Your Google account (<strong className="text-indigo-700">{PRIMARY_OWNER_EMAIL}</strong>) is preserved as the sole Super Admin.</li>
+                  <li>All non-owner member accounts are permanently removed.</li>
+                  <li>Your Administrator account (<strong className="text-indigo-700">{PRIMARY_OWNER_EMAIL}</strong>) is preserved as the sole Super Admin.</li>
                   <li>You can then add your real developers and colleagues cleanly via the Add Member tab or Google Sign In.</li>
                 </ul>
 
@@ -576,7 +576,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
                 >
                   <Trash2 size={16} />
-                  <span>Purge Demo Users & Start Clean Slate</span>
+                  <span>Purge Users & Keep Only Super Admin</span>
                 </button>
               </div>
             </div>
@@ -609,7 +609,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Are you sure you want to remove all demo users? Your current Google account (<strong className="text-slate-900">{PRIMARY_OWNER_EMAIL}</strong>) will be kept as the owner so you maintain full admin access.
+              Are you sure you want to remove all non-owner member accounts? Your account (<strong className="text-slate-900">{PRIMARY_OWNER_EMAIL}</strong>) will be kept as the owner so you maintain full admin access.
             </p>
 
             <div>

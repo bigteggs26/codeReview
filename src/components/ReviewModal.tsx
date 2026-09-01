@@ -24,6 +24,7 @@ import { DiffViewer } from './DiffViewer';
 import { AiDetectorBadge } from './AiDetectorBadge';
 import { AiDetectorCard } from './AiDetectorCard';
 import { CodeLivePreview, isRenderableCode } from './CodeLivePreview';
+import { LanguageBadge } from './LanguageBadge';
 
 interface ReviewModalProps {
   submission: Submission;
@@ -238,9 +239,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold border border-slate-200 uppercase">
-                  {submission.language}
-                </span>
+                <LanguageBadge language={submission.language} size="xs" />
                 <span className="text-xs text-slate-500">
                   Submitted by <strong className="text-slate-800">{submission.memberName}</strong>
                 </span>

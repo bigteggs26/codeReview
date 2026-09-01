@@ -20,6 +20,7 @@ import {
 import { Submission, User, SubmissionStatus, ProgrammingLanguage } from '../types';
 import { AiDetectorBadge } from './AiDetectorBadge';
 import { isRenderableCode } from './CodeLivePreview';
+import { LanguageBadge } from './LanguageBadge';
 
 interface AdminQueueProps {
   currentUser: User;
@@ -354,9 +355,7 @@ export const AdminQueue: React.FC<AdminQueueProps> = ({
                         <span className="font-bold text-sm text-slate-900">
                           {sub.memberName}
                         </span>
-                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 uppercase font-bold">
-                          {sub.language}
-                        </span>
+                        <LanguageBadge language={sub.language} size="xs" />
                         {getStatusBadge(sub.status)}
 
                         {isRenderableCode(sub.code, sub.language) && (

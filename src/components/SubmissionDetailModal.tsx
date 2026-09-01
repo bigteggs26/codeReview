@@ -25,6 +25,7 @@ import { CodeEditor } from './CodeEditor';
 import { AiDetectorCard } from './AiDetectorCard';
 import { AiDetectorBadge } from './AiDetectorBadge';
 import { CodeLivePreview, isRenderableCode } from './CodeLivePreview';
+import { LanguageBadge } from './LanguageBadge';
 
 interface SubmissionDetailModalProps {
   submission: Submission;
@@ -139,9 +140,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs px-2.5 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold uppercase border border-slate-200">
-                  {submission.language}
-                </span>
+                <LanguageBadge language={submission.language} size="xs" />
                 {getStatusBadge(submission.status)}
                 <AiDetectorBadge
                   detection={submission.aiDetection}
