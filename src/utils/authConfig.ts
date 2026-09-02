@@ -1,22 +1,27 @@
 import { User, AdminEntry } from '../types';
 
-export const PRIMARY_OWNER_EMAIL = 'admin@codescore.dev';
-export const MASTER_ADMIN_PASSCODES = ['ADMIN777', 'ROOT999'];
+export const PRIMARY_OWNER_EMAIL = 'bigteggs26@gmail.com';
+export const PRIMARY_OWNER_EMAILS = [
+  'bigteggs26@gmail.com',
+  'admin@codescore.dev',
+];
 export const STORAGE_KEY_ADMIN_LIST = 'codescore_portal_admin_whitelist_v1';
 export const STORAGE_KEY_AUTH_SESSION = 'codescore_portal_auth_session_v1';
 
-// Helper to verify an admin passcode
-export function isValidAdminCode(code: string): boolean {
-  if (!code) return false;
-  const clean = code.trim().toUpperCase();
-  return MASTER_ADMIN_PASSCODES.includes(clean);
-}
-
 export const INITIAL_ADMINS: AdminEntry[] = [
   {
-    id: 'admin-owner',
-    email: PRIMARY_OWNER_EMAIL,
+    id: 'admin-owner-google',
+    email: 'bigteggs26@gmail.com',
     name: 'Lead Administrator',
+    role: 'super_admin',
+    addedAt: '2026-08-30T00:00:00Z',
+    addedBy: 'System (Primary Owner)',
+    isPrimaryOwner: true,
+  },
+  {
+    id: 'admin-owner-internal',
+    email: 'admin@codescore.dev',
+    name: 'Platform Administrator',
     role: 'super_admin',
     addedAt: '2026-08-30T00:00:00Z',
     addedBy: 'System (Primary Owner)',
@@ -26,12 +31,19 @@ export const INITIAL_ADMINS: AdminEntry[] = [
 
 export const DEFAULT_ADMIN_LIST = INITIAL_ADMINS;
 
-// Helper to check if an email is an authorized admin
-export function isEmailAdmin(email: string, adminList: AdminEntry[]): boolean {
+// Helper to check if an email belongs to a primary owner
+export function isPrimaryOwner(email: string): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  if (normalized === PRIMARY_OWNER_EMAIL.toLowerCase()) return true;
-  return adminList.some((a) => a.email.trim().toLowerCase() === normalized);
+  return PRIMARY_OWNER_EMAILS.some((ownerEmail) => ownerEmail.toLowerCase() === normalized);
+}
+
+// Helper to check if an email is an authorized admin
+export function isEmailAdmin(email: string, adminList: AdminEntry[] = []): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (isPrimaryOwner(normalized)) return true;
+  return adminList.some((a) => a.email?.trim().toLowerCase() === normalized);
 }
 
 // Generate an avatar URL based on email/name

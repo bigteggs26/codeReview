@@ -12,10 +12,10 @@ import { AuthModal } from './components/AuthModal';
 import { AuthGate } from './components/AuthGate';
 import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { AdminManagementModal } from './components/AdminManagementModal';
-import { AdminPasscodeModal } from './components/AdminPasscodeModal';
 import {
   DEFAULT_ADMIN_LIST,
   PRIMARY_OWNER_EMAIL,
+  isPrimaryOwner,
   isEmailAdmin,
   getAvatarUrl,
 } from './utils/authConfig';
@@ -97,7 +97,6 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [adminManagementModalOpen, setAdminManagementModalOpen] = useState(false);
-  const [adminPasscodeModalOpen, setAdminPasscodeModalOpen] = useState(false);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<{ title: string; desc?: string } | null>(null);
@@ -261,13 +260,12 @@ export default function App() {
 
   // Login Success Handler
   const handleLoginSuccess = async (authUser: User) => {
-    const isAdmin = isEmailAdmin(authUser.email, adminList);
+    const isSuper = isPrimaryOwner(authUser.email) || Boolean(authUser.isSuperAdmin);
+    const isAdmin = isSuper || isEmailAdmin(authUser.email, adminList);
     const updatedUser: User = {
       ...authUser,
       role: isAdmin ? 'admin' : 'member',
-      isSuperAdmin:
-        authUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() ||
-        authUser.isSuperAdmin,
+      isSuperAdmin: isSuper,
       lastSeenAt: new Date().toISOString(),
       authenticatedAt: authUser.authenticatedAt || new Date().toISOString(),
     };
@@ -319,7 +317,7 @@ export default function App() {
   };
 
   const handleRemoveAdmin = async (adminId: string, email: string) => {
-    if (email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase()) {
+    if (isPrimaryOwner(email)) {
       showToast('Cannot Remove Owner', 'The Primary Owner account cannot be removed from admins.');
       return;
     }
@@ -343,7 +341,7 @@ export default function App() {
 
   const handleDeleteUser = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
-    if (target?.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase()) {
+    if (isPrimaryOwner(target?.email || '')) {
       showToast('Cannot Delete Owner', 'Primary Owner cannot be deleted.');
       return;
     }
@@ -365,7 +363,7 @@ export default function App() {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
 
-    if (target.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() && newRole === 'member') {
+    if (isPrimaryOwner(target.email || '') && newRole === 'member') {
       showToast('Cannot Demote Owner', 'Primary Owner must retain Admin privileges.');
       return;
     }
@@ -424,7 +422,7 @@ export default function App() {
     handleSignOut();
     showToast(
       'All Accounts Cleared',
-      'Database wiped. Enter master passcode ADMIN777 anytime to restore Super Admin status.'
+      'Database wiped. Primary owner accounts maintain Super Admin access upon signing in.'
     );
   };
 
@@ -606,7 +604,6 @@ export default function App() {
           setAuthModalOpen(true);
         }}
         onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
-        onOpenPasscodeModal={() => setAdminPasscodeModalOpen(true)}
         onSignOut={handleSignOut}
         pendingCount={pendingCount}
         isCloudConnected={isCloudConnected}
@@ -682,27 +679,6 @@ export default function App() {
           onWipeEverything={handleTotalPurge}
           onAddTeamMember={handleAddTeamMember}
           onForceReloginAll={handleForceReloginAll}
-        />
-      )}
-
-      {/* Instant Admin Passcode Modal */}
-      {adminPasscodeModalOpen && (
-        <AdminPasscodeModal
-          isOpen={adminPasscodeModalOpen}
-          onClose={() => setAdminPasscodeModalOpen(false)}
-          onSuccess={() => {
-            const adminUser: User = {
-              ...PRIMARY_OWNER_USER,
-              id: currentUser?.id || PRIMARY_OWNER_USER.id,
-              email: currentUser?.email || PRIMARY_OWNER_EMAIL,
-              name: currentUser?.name || 'Lead Admin',
-              role: 'admin',
-              isSuperAdmin: true,
-            };
-            setCurrentUser(adminUser);
-            saveUserToCloud(adminUser).catch(console.error);
-            showToast('Super Admin Verified!', 'You now have full Admin access & permissions.');
-          }}
         />
       )}
 

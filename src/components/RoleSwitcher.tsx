@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserCheck, Shield, Users, RefreshCw, LogIn, ShieldCheck, Sparkles } from 'lucide-react';
 import { User } from '../types';
-import { PRIMARY_OWNER_EMAIL } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner } from '../utils/authConfig';
 
 interface RoleSwitcherProps {
   currentUser: User;
@@ -21,8 +21,8 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
   const admins = allUsers.filter((u) => u.role === 'admin');
   const members = allUsers.filter((u) => u.role === 'member');
   const isSuperAdmin =
-    currentUser.isSuperAdmin ||
-    currentUser.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+    Boolean(currentUser.isSuperAdmin) ||
+    isPrimaryOwner(currentUser.email || '');
 
   return (
     <div className="bg-white border-t border-slate-200 py-2.5 px-4 text-xs shadow-xs">

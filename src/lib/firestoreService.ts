@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Submission, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, DEFAULT_ADMIN_LIST } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner, DEFAULT_ADMIN_LIST } from '../utils/authConfig';
 import { PRIMARY_OWNER_USER } from '../data/initialData';
 
 const USERS_COLLECTION = 'users';
@@ -181,7 +181,7 @@ export async function clearAllUsersFromCloud(preserveUser: User): Promise<void> 
   snapshot.forEach((docSnap) => {
     const data = docSnap.data() as User;
     if (
-      data.email?.toLowerCase() !== PRIMARY_OWNER_EMAIL.toLowerCase() &&
+      !isPrimaryOwner(data.email || '') &&
       data.id !== preserveUser.id
     ) {
       batch.delete(docSnap.ref);

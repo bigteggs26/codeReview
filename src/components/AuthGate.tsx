@@ -21,7 +21,7 @@ import {
   Laptop,
 } from 'lucide-react';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, isEmailAdmin } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner, isEmailAdmin } from '../utils/authConfig';
 import {
   smartAuthenticate,
   signInWithEmail,
@@ -177,7 +177,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     }
   };
 
-  const isOwnerEmail = email.trim().toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+  const isOwnerEmail = isPrimaryOwner(email.trim());
   const isAdminEmail = isEmailAdmin(email, adminList);
 
   return (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Shield, User as UserIcon, Code2, Trophy, ListOrdered, PlusCircle, Sparkles, LogIn, Settings, ShieldCheck, LogOut, UserCheck, Cloud, CloudOff, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
 import { User, Role } from '../types';
-import { PRIMARY_OWNER_EMAIL } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner } from '../utils/authConfig';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -12,7 +12,6 @@ interface HeaderProps {
   onOpenSubmitModal: () => void;
   onOpenAuthModal: (mode?: 'signin' | 'signup') => void;
   onOpenAdminManagement: () => void;
-  onOpenPasscodeModal?: () => void;
   onSignOut?: () => void;
   pendingCount: number;
   isCloudConnected?: boolean;
@@ -27,7 +26,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSubmitModal,
   onOpenAuthModal,
   onOpenAdminManagement,
-  onOpenPasscodeModal,
   onSignOut,
   pendingCount,
   isCloudConnected = true,
@@ -35,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isAdmin = currentUser?.role === 'admin';
   const isSuperAdmin =
     Boolean(currentUser?.isSuperAdmin) ||
-    currentUser?.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+    isPrimaryOwner(currentUser?.email || '');
   const isEmailVerified = Boolean(currentUser?.emailVerified);
 
   return (
@@ -254,19 +252,6 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <ShieldCheck size={14} />
                           <span>Manage Admins & User Directory</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {onOpenPasscodeModal && (
-                      <div className="p-1 border-b border-slate-100">
-                        <button
-                          id="header-admin-passcode-btn"
-                          onClick={onOpenPasscodeModal}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-800 text-xs font-bold flex items-center gap-2 transition-colors"
-                        >
-                          <Sparkles size={14} className="text-amber-500" />
-                          <span>Enter Admin Passcode (ADMIN777)</span>
                         </button>
                       </div>
                     )}

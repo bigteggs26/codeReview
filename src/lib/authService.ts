@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth } from './firebase';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, isEmailAdmin, getAvatarUrl } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner, isEmailAdmin, getAvatarUrl } from '../utils/authConfig';
 
 /**
  * Format a Firebase User into our application User object
@@ -23,7 +23,7 @@ export function formatFirebaseUser(
   adminList: AdminEntry[] = []
 ): User {
   const email = (firebaseUser.email || '').trim().toLowerCase();
-  const isSuper = email === PRIMARY_OWNER_EMAIL.toLowerCase();
+  const isSuper = isPrimaryOwner(email);
   const isAdmin = isSuper || isEmailAdmin(email, adminList);
   const isGoogle =
     firebaseUser.providerData.some((p) => p.providerId === 'google.com') ||
@@ -81,7 +81,7 @@ export function createDirectSessionUser(
   adminList: AdminEntry[] = []
 ): User {
   const normalizedEmail = email.trim().toLowerCase();
-  const isSuper = normalizedEmail === PRIMARY_OWNER_EMAIL.toLowerCase();
+  const isSuper = isPrimaryOwner(normalizedEmail);
   const isAdmin = isSuper || (role === 'admin') || isEmailAdmin(normalizedEmail, adminList);
   
   const displayName =

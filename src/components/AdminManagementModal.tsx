@@ -17,7 +17,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, getAvatarUrl } from '../utils/authConfig';
+import { PRIMARY_OWNER_EMAIL, isPrimaryOwner, getAvatarUrl } from '../utils/authConfig';
 
 interface AdminManagementModalProps {
   currentUser: User;
@@ -70,8 +70,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [totalWipeConfirmText, setTotalWipeConfirmText] = useState('');
 
   const isSuperAdmin =
-    currentUser.isSuperAdmin ||
-    currentUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+    Boolean(currentUser.isSuperAdmin) ||
+    isPrimaryOwner(currentUser.email);
 
   const handleAddAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,7 +298,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   {adminList.map((admin) => {
                     const isOwner =
                       admin.isPrimaryOwner ||
-                      admin.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+                      isPrimaryOwner(admin.email);
 
                     return (
                       <div
@@ -394,7 +394,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
               <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
                 {users.map((u) => {
-                  const isOwner = u.email?.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
+                  const isOwner = isPrimaryOwner(u.email || '');
                   const isCurrent = u.id === currentUser.id;
 
                   return (
@@ -584,8 +584,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </p>
                 <ul className="text-xs text-slate-600 list-disc list-inside space-y-1">
                   <li>All non-owner member accounts and test users are permanently deleted.</li>
-                  <li>Your Administrator account (<strong className="text-indigo-700">{PRIMARY_OWNER_EMAIL}</strong>) is preserved as the sole Super Admin.</li>
-                  <li>You can always reclaim or verify Super Admin status instantly on any device by entering the master admin code: <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">ADMIN777</code> or <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">ROOT999</code>.</li>
+                  <li>Your Administrator account (<strong className="text-indigo-700">{PRIMARY_OWNER_EMAIL}</strong>) is preserved as the Super Admin.</li>
+                  <li>Primary Owner accounts retain full administrative access whenever they sign in via Google or email without needing passcodes.</li>
                   <li>You can then add your real developers and colleagues cleanly via the Add Member tab or the Sign Up portal.</li>
                 </ul>
 
@@ -720,7 +720,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              This will completely wipe all registered users from the Firestore database. You can instantly restore your Super Admin status afterwards anytime by entering the master admin code <strong className="text-indigo-600 font-mono">ADMIN777</strong> or <strong className="text-indigo-600 font-mono">ROOT999</strong>.
+              This will completely wipe registered users from the Firestore database. Primary owners maintain their access automatically when signing in.
             </p>
 
             <div>
