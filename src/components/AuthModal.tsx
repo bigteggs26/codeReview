@@ -85,8 +85,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onLoginSuccess(user);
       onClose();
     } catch (err: any) {
-      console.error('Google Auth Error:', err);
-      setErrorMsg(getAuthErrorMessage(err));
+      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+        console.info('Google sign-in popup was dismissed by user.');
+        setErrorMsg('Google sign-in was dismissed. You can try again or use email & password.');
+      } else {
+        console.warn('Google Auth notice:', err?.message || err);
+        setErrorMsg(getAuthErrorMessage(err));
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -106,7 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onLoginSuccess(result.user);
       onClose();
     } catch (err: any) {
-      console.error('Sign In Error:', err);
+      console.warn('Sign In notice:', err?.message || err);
       setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);
@@ -145,7 +150,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onLoginSuccess(appUser);
       onClose();
     } catch (err: any) {
-      console.error('Sign Up Error:', err);
+      console.warn('Sign Up notice:', err?.message || err);
       setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);
@@ -167,7 +172,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         `Password reset email sent to ${email}! Please check your inbox and follow the instructions.`
       );
     } catch (err: any) {
-      console.error('Password Reset Error:', err);
+      console.warn('Password Reset notice:', err?.message || err);
       setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);

@@ -297,9 +297,9 @@ export function getAuthErrorMessage(error: any): string {
 
   switch (code) {
     case 'auth/popup-closed-by-user':
-      return 'Google sign-in popup was closed before finishing. Please try again.';
+      return 'Google sign-in was dismissed. You can try again or sign in with email & password.';
     case 'auth/cancelled-popup-request':
-      return 'Previous Google sign-in request was cancelled. Please try again.';
+      return 'Google sign-in request was cancelled. Please try again.';
     case 'auth/popup-blocked':
       return 'The sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
     case 'auth/unauthorized-domain':

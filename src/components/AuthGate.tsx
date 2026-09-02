@@ -83,8 +83,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({
       const user = await signInWithGoogle(adminList);
       onLoginSuccess(user);
     } catch (err: any) {
-      console.error('Google Auth Error:', err);
-      setErrorMsg(getAuthErrorMessage(err));
+      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+        // User closed or cancelled the popup - expected interaction, not a critical system error
+        console.info('Google sign-in popup was dismissed by the user.');
+        setErrorMsg('Google sign-in was dismissed. You can try again or sign in with email & password below.');
+      } else {
+        console.warn('Google Auth notice:', err?.message || err);
+        setErrorMsg(getAuthErrorMessage(err));
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -104,7 +110,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
       const result = await smartAuthenticate(email, password, name, adminList);
       onLoginSuccess(result.user);
     } catch (err: any) {
-      console.error('Gate Sign In Error:', err);
+      console.warn('Gate Sign In notice:', err?.message || err);
       const friendlyMsg = getAuthErrorMessage(err);
       setErrorMsg(friendlyMsg);
     } finally {
@@ -142,7 +148,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
       const appUser = formatFirebaseUser(firebaseUser, adminList);
       onLoginSuccess(appUser);
     } catch (err: any) {
-      console.error('Gate Sign Up Error:', err);
+      console.warn('Gate Sign Up notice:', err?.message || err);
       setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);
@@ -164,7 +170,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
         `A secure reset link has been dispatched to ${email}. Please check your inbox.`
       );
     } catch (err: any) {
-      console.error('Gate Reset Error:', err);
+      console.warn('Gate Reset notice:', err?.message || err);
       setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);
