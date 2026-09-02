@@ -26,6 +26,7 @@ export interface User {
   isSuperAdmin?: boolean;
   isCustomUser?: boolean;
   lastSeenAt?: string;
+  authenticatedAt?: string;
 }
 
 export interface AdminEntry {

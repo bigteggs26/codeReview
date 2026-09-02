@@ -9,6 +9,7 @@ import { SubmitModal } from './components/SubmitModal';
 import { ReviewModal } from './components/ReviewModal';
 import { SubmissionDetailModal } from './components/SubmissionDetailModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthGate } from './components/AuthGate';
 import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { AdminManagementModal } from './components/AdminManagementModal';
 import { AdminPasscodeModal } from './components/AdminPasscodeModal';
@@ -22,6 +23,8 @@ import {
   subscribeToUsers,
   subscribeToSubmissions,
   subscribeToAdmins,
+  subscribeToAuthPolicy,
+  broadcastForceRelogin,
   saveUserToCloud,
   deleteUserFromCloud,
   saveSubmissionToCloud,
@@ -36,7 +39,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { signOutUser, formatFirebaseUser } from './lib/authService';
 import { CheckCircle2, CloudCheck, CloudOff, Info } from 'lucide-react';
 
-const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v2';
+const STORAGE_KEY_CURRENT_USER = 'codescore_portal_active_user_v6';
+const STORAGE_KEY_FORCE_RELOGIN_APPLIED = 'codescore_force_relogin_v20260902_epoch1';
 
 export default function App() {
   const [adminList, setAdminList] = useState<AdminEntry[]>(DEFAULT_ADMIN_LIST);
@@ -44,19 +48,40 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
-  // Directly provide user session without mandatory sign-in gate
-  const [currentUser, setCurrentUser] = useState<User>(() => {
+  // Forced Re-login Enforcement:
+  // Purge any stale, cached, or automatically granted sessions so all users are required to sign in freshly.
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
+      const hasAppliedRevocation = localStorage.getItem(STORAGE_KEY_FORCE_RELOGIN_APPLIED);
+      if (!hasAppliedRevocation) {
+        // Purge all legacy stored session keys
+        const legacyKeys = [
+          'codescore_portal_active_user_v1',
+          'codescore_portal_active_user_v2',
+          'codescore_portal_active_user_v3',
+          'codescore_portal_active_user_v4',
+          'codescore_portal_active_user_v5',
+          'codescore_portal_active_user',
+          'codescore_portal_auth_session_v1',
+          'codescore_portal_google_auth_session_v1',
+          STORAGE_KEY_CURRENT_USER,
+        ];
+        legacyKeys.forEach((key) => localStorage.removeItem(key));
+        localStorage.setItem(STORAGE_KEY_FORCE_RELOGIN_APPLIED, 'true');
+        signOutUser().catch(() => {});
+        return null;
+      }
+
       const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.email && !parsed.email.endsWith('@teamdev.internal')) {
+        if (parsed && parsed.email && parsed.authenticatedAt) {
           return parsed;
         }
       }
-      return PRIMARY_OWNER_USER;
+      return null;
     } catch {
-      return PRIMARY_OWNER_USER;
+      return null;
     }
   });
 
@@ -93,6 +118,13 @@ export default function App() {
   // Listen to Firebase Auth state changes
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      const hasAppliedRevocation = localStorage.getItem(STORAGE_KEY_FORCE_RELOGIN_APPLIED);
+      if (!hasAppliedRevocation) {
+        await signOutUser().catch(() => {});
+        setCurrentUser(null);
+        return;
+      }
+
       if (firebaseUser) {
         const appUser = formatFirebaseUser(firebaseUser, adminList);
         setCurrentUser(appUser);
@@ -106,6 +138,31 @@ export default function App() {
 
     return () => unsubscribeAuth();
   }, [adminList]);
+
+  // Real-time listener for global session revocation / security policies
+  useEffect(() => {
+    const unsubPolicy = subscribeToAuthPolicy((policy) => {
+      if (!policy?.forceReloginAt) return;
+      const revocationTime = new Date(policy.forceReloginAt).getTime();
+
+      setCurrentUser((prev) => {
+        if (!prev) return null;
+        const sessionTime = prev.authenticatedAt ? new Date(prev.authenticatedAt).getTime() : 0;
+        if (sessionTime < revocationTime) {
+          signOutUser().catch(() => {});
+          localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+          showToast(
+            'Session Expired',
+            'All active sessions were revoked by the administrator. Please log in again.'
+          );
+          return null;
+        }
+        return prev;
+      });
+    });
+
+    return () => unsubPolicy();
+  }, []);
 
   // Real-time Firestore Cloud Synchronization
   useEffect(() => {
@@ -174,7 +231,7 @@ export default function App() {
     }
   };
 
-  // Reset session to default super admin
+  // Sign out user and return to authentication portal
   const handleSignOut = async () => {
     try {
       await signOutUser();
@@ -182,9 +239,24 @@ export default function App() {
       console.warn('Sign out notice:', e);
     }
     localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-    setCurrentUser(PRIMARY_OWNER_USER);
+    setCurrentUser(null);
     setActiveTab('dashboard');
-    showToast('Signed Out', 'Session reset to default Super Admin workspace.');
+    showToast('Signed Out', 'You have been signed out. Please sign in to continue.');
+  };
+
+  // Force all users across all devices to re-login by publishing a session revocation timestamp to Firestore
+  const handleForceReloginAll = async () => {
+    try {
+      const revokedBy = currentUser?.email || PRIMARY_OWNER_EMAIL;
+      await broadcastForceRelogin(revokedBy, 'Administrator triggered global forced re-login.');
+      await signOutUser().catch(() => {});
+      localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      setCurrentUser(null);
+      showToast('All Sessions Revoked', 'Forced all users to re-login across all active devices.');
+    } catch (e) {
+      console.error('Error broadcasting force relogin:', e);
+      showToast('Action Failed', 'Could not broadcast global relogin policy.');
+    }
   };
 
   // Login Success Handler
@@ -197,6 +269,7 @@ export default function App() {
         authUser.email.toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase() ||
         authUser.isSuperAdmin,
       lastSeenAt: new Date().toISOString(),
+      authenticatedAt: authUser.authenticatedAt || new Date().toISOString(),
     };
 
     // Save to Cloud Firestore so all users and devices instantly see this account
@@ -488,6 +561,33 @@ export default function App() {
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
 
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC]">
+        <AuthGate
+          onLoginSuccess={handleLoginSuccess}
+          adminList={adminList}
+          isCloudConnected={isCloudConnected}
+        />
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-200">
+            <div className="rounded-xl bg-slate-900 text-white border border-slate-700 shadow-2xl p-4 flex items-start gap-3 max-w-sm">
+              <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
+                <CheckCircle2 size={16} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">{toastMessage.title}</p>
+                {toastMessage.desc && (
+                  <p className="text-[11px] text-slate-300 mt-0.5">{toastMessage.desc}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Navigation */}
@@ -581,6 +681,7 @@ export default function App() {
           onRemoveAllUsers={handleRemoveAllUsers}
           onWipeEverything={handleTotalPurge}
           onAddTeamMember={handleAddTeamMember}
+          onForceReloginAll={handleForceReloginAll}
         />
       )}
 

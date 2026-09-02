@@ -226,3 +226,52 @@ export async function wipeAllCloudData(): Promise<void> {
   await batch.commit();
 }
 
+const SYSTEM_COLLECTION = 'system';
+const AUTH_POLICY_DOC = 'auth_policy';
+
+export interface AuthPolicy {
+  forceReloginAt?: string;
+  requestedBy?: string;
+  reason?: string;
+}
+
+/**
+ * Real-time listener for global session / auth policy
+ */
+export function subscribeToAuthPolicy(
+  onUpdate: (policy: AuthPolicy | null) => void,
+  onError?: (err: Error) => void
+): Unsubscribe {
+  const policyRef = doc(db, SYSTEM_COLLECTION, AUTH_POLICY_DOC);
+  return onSnapshot(
+    policyRef,
+    (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data() as AuthPolicy);
+      } else {
+        onUpdate(null);
+      }
+    },
+    (err) => {
+      console.warn('Auth policy listener warning:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Broadcasts a global session revocation event across all clients
+ */
+export async function broadcastForceRelogin(byEmail: string, reason?: string): Promise<void> {
+  const policyRef = doc(db, SYSTEM_COLLECTION, AUTH_POLICY_DOC);
+  await setDoc(
+    policyRef,
+    {
+      forceReloginAt: new Date().toISOString(),
+      requestedBy: byEmail,
+      reason: reason || 'Administrator forced all users to re-login',
+    },
+    { merge: true }
+  );
+}
+

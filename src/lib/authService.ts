@@ -67,6 +67,7 @@ export function formatFirebaseUser(
     emailVerified: isGoogle ? true : firebaseUser.emailVerified,
     isSuperAdmin: isSuper,
     lastSeenAt: new Date().toISOString(),
+    authenticatedAt: new Date().toISOString(),
   };
 }
 
@@ -111,6 +112,7 @@ export function createDirectSessionUser(
     emailVerified: true,
     isSuperAdmin: isSuper,
     lastSeenAt: new Date().toISOString(),
+    authenticatedAt: new Date().toISOString(),
   };
 }
 

@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Sparkles,
   RefreshCw,
-  Award
+  Award,
+  LogOut,
 } from 'lucide-react';
 import { User, AdminEntry } from '../types';
 import { PRIMARY_OWNER_EMAIL, getAvatarUrl } from '../utils/authConfig';
@@ -30,6 +31,7 @@ interface AdminManagementModalProps {
   onRemoveAllUsers: (preserveCurrentUser: boolean) => void;
   onWipeEverything?: () => void;
   onAddTeamMember: (member: Omit<User, 'id'>) => void;
+  onForceReloginAll?: () => void;
 }
 
 export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
@@ -44,6 +46,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   onRemoveAllUsers,
   onWipeEverything,
   onAddTeamMember,
+  onForceReloginAll,
 }) => {
   const [activeTab, setActiveTab] = useState<'admins' | 'users' | 'add_member' | 'danger_zone'>('admins');
 
@@ -587,6 +590,27 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </ul>
 
                 <div className="pt-3 border-t border-rose-100 flex flex-col gap-2">
+                  {onForceReloginAll && (
+                    <button
+                      type="button"
+                      id="trigger-force-relogin-all-btn"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Are you sure you want to revoke all active sessions across all devices? Every user (including this browser) will be immediately logged out and required to re-authenticate.'
+                          )
+                        ) {
+                          onForceReloginAll();
+                          onClose();
+                        }
+                      }}
+                      className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogOut size={15} />
+                      <span>Security: Force All Users to Re-login (Revoke All Sessions)</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     id="trigger-remove-all-users-btn"
