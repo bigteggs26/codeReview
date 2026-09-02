@@ -4,15 +4,16 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
-  signInWithPopup,
   updateProfile,
   onAuthStateChanged,
   reload,
+  GoogleAuthProvider,
+  signInWithPopup,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth, googleAuthProvider } from './firebase';
+import { auth } from './firebase';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, isEmailAdmin, getAvatarUrl } from '../utils/googleAuth';
+import { PRIMARY_OWNER_EMAIL, isEmailAdmin, getAvatarUrl } from '../utils/authConfig';
 
 /**
  * Format a Firebase User into our application User object
@@ -24,10 +25,14 @@ export function formatFirebaseUser(
   const email = (firebaseUser.email || '').trim().toLowerCase();
   const isSuper = email === PRIMARY_OWNER_EMAIL.toLowerCase();
   const isAdmin = isSuper || isEmailAdmin(email, adminList);
+  const isGoogle =
+    firebaseUser.providerData.some((p) => p.providerId === 'google.com') ||
+    email.endsWith('@gmail.com');
+
   const name =
     firebaseUser.displayName?.trim() ||
     (isSuper
-      ? 'bigteggs26 (Super Admin)'
+      ? 'Lead Administrator'
       : email
       ? email.split('@')[0].replace('.', ' ').replace(/^./, (str) => str.toUpperCase())
       : 'Developer');
@@ -35,10 +40,6 @@ export function formatFirebaseUser(
   const avatar =
     firebaseUser.photoURL ||
     getAvatarUrl(name, email);
-
-  const isGoogle = firebaseUser.providerData.some(
-    (p) => p.providerId === 'google.com'
-  );
 
   return {
     id: firebaseUser.uid,
@@ -50,6 +51,8 @@ export function formatFirebaseUser(
       ? 'Super Administrator & Lead Reviewer'
       : isAdmin
       ? 'Platform Reviewer & Admin'
+      : isGoogle
+      ? 'Verified Developer'
       : 'Software Engineer',
     badge: isSuper
       ? 'Super Admin'
@@ -61,7 +64,7 @@ export function formatFirebaseUser(
       ? 'Verified Member'
       : 'Member (Unverified)',
     authProvider: isGoogle ? 'google' : 'password',
-    emailVerified: firebaseUser.emailVerified,
+    emailVerified: isGoogle ? true : firebaseUser.emailVerified,
     isSuperAdmin: isSuper,
     lastSeenAt: new Date().toISOString(),
   };
@@ -83,7 +86,7 @@ export function createDirectSessionUser(
   const displayName =
     name?.trim() ||
     (isSuper
-      ? 'bigteggs26 (Super Admin)'
+      ? 'Lead Administrator'
       : normalizedEmail
       ? normalizedEmail.split('@')[0].replace('.', ' ').replace(/^./, (str) => str.toUpperCase())
       : 'Developer');
@@ -104,7 +107,7 @@ export function createDirectSessionUser(
       : isAdmin
       ? 'Team Admin'
       : 'Verified Member',
-    authProvider: normalizedEmail.includes('@gmail.com') ? 'google' : 'password',
+    authProvider: 'password',
     emailVerified: true,
     isSuperAdmin: isSuper,
     lastSeenAt: new Date().toISOString(),
@@ -229,6 +232,16 @@ export async function smartAuthenticate(
 }
 
 /**
+ * Sign in or sign up with Google account via Firebase Popup
+ */
+export async function signInWithGoogle(adminList: AdminEntry[] = []): Promise<User> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const result = await signInWithPopup(auth, provider);
+  return formatFirebaseUser(result.user, adminList);
+}
+
+/**
  * Resend Email Verification link to the currently signed-in user
  */
 export async function resendVerificationEmail(): Promise<void> {
@@ -247,14 +260,6 @@ export async function sendPasswordReset(email: string): Promise<void> {
     throw new Error('Please enter a valid email address.');
   }
   await sendPasswordResetEmail(auth, email.trim());
-}
-
-/**
- * Sign in with Google Popup
- */
-export async function signInWithGooglePopup(): Promise<FirebaseUser> {
-  const result = await signInWithPopup(auth, googleAuthProvider);
-  return result.user;
 }
 
 /**
@@ -289,12 +294,22 @@ export function getAuthErrorMessage(error: any): string {
   const message = error.message || '';
 
   switch (code) {
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in popup was closed before finishing. Please try again.';
+    case 'auth/cancelled-popup-request':
+      return 'Previous Google sign-in request was cancelled. Please try again.';
+    case 'auth/popup-blocked':
+      return 'The sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
+    case 'auth/unauthorized-domain':
+      return 'This application domain is not yet authorized in Firebase OAuth. Please check domain authorization.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using a different sign-in method.';
     case 'auth/user-not-found':
-      return 'No account found with this email. Click "Create Account" tab or use 1-Click Quick Access.';
+      return 'No account found with this email. Please click the "Create Account" tab or sign in with Google.';
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
     case 'auth/invalid-login-credentials':
-      return 'Incorrect password or credentials. If you haven\'t created this account yet, click "Create Account" or use 1-Click Quick Access.';
+      return 'Incorrect password or credentials. If you have not created this account yet, click "Create Account" or sign in with Google.';
     case 'auth/email-already-in-use':
       return 'An account with this email already exists. Switch to the "Sign In" tab or reset your password.';
     case 'auth/weak-password':
@@ -302,16 +317,12 @@ export function getAuthErrorMessage(error: any): string {
     case 'auth/invalid-email':
       return 'The email address format is invalid. Please enter a valid email address.';
     case 'auth/too-many-requests':
-      return 'Access temporarily disabled due to many failed attempts. Please reset your password or try 1-Click Quick Access.';
+      return 'Access temporarily disabled due to many failed attempts. Please reset your password or sign in with Google.';
     case 'auth/network-request-failed':
-      return 'Network error occurred. Please check your connection or use 1-Click Quick Access.';
-    case 'auth/popup-closed-by-user':
-      return 'Google sign-in popup was closed before completing.';
-    case 'auth/popup-blocked':
-      return 'Google sign-in popup was blocked by browser sandbox. Use 1-Click Quick Access below to enter immediately.';
+      return 'Network error occurred. Please check your internet connection.';
     case 'auth/operation-not-allowed':
     case 'auth/admin-restricted-operation':
-      return 'Authentication provider notice: Quick Access mode is enabled so you can log in immediately.';
+      return 'Authentication operation restricted. Please sign in with Google or contact the administrator.';
     default:
       return message || 'Authentication failed. Please check your details and try again.';
   }

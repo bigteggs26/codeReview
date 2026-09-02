@@ -21,16 +21,15 @@ import {
   Laptop,
 } from 'lucide-react';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, isEmailAdmin } from '../utils/googleAuth';
+import { PRIMARY_OWNER_EMAIL, isEmailAdmin } from '../utils/authConfig';
 import {
   smartAuthenticate,
   signInWithEmail,
   signUpWithEmail,
   sendPasswordReset,
-  signInWithGooglePopup,
   formatFirebaseUser,
   getAuthErrorMessage,
-  createDirectSessionUser,
+  signInWithGoogle,
 } from '../lib/authService';
 
 interface AuthGateProps {
@@ -56,7 +55,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [fallbackUserPrompt, setFallbackUserPrompt] = useState<{ email: string; name?: string } | null>(null);
 
   // Password strength helper
   const getPasswordStrength = (pwd: string) => {
@@ -76,14 +74,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({
 
   const strength = getPasswordStrength(password);
 
-  // Direct login helper (Instant profile or fallback)
-  const handleQuickLogin = (presetEmail: string, presetName: string, presetRole?: 'admin' | 'member') => {
+  // Google Sign In / Sign Up handler
+  const handleGoogleAuth = async () => {
     setIsProcessing(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
     try {
-      const user = createDirectSessionUser(presetEmail, presetName, presetRole, adminList);
+      const user = await signInWithGoogle(adminList);
       onLoginSuccess(user);
-    } catch (e) {
-      console.error('Quick login error:', e);
+    } catch (err: any) {
+      console.error('Google Auth Error:', err);
+      setErrorMsg(getAuthErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -97,17 +98,15 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     setIsProcessing(true);
     setErrorMsg(null);
     setSuccessMsg(null);
-    setFallbackUserPrompt(null);
 
     try {
-      // Use smart authentication which checks Firebase signin/signup with seamless fallback
+      // Use smart authentication which checks Firebase signin/signup
       const result = await smartAuthenticate(email, password, name, adminList);
       onLoginSuccess(result.user);
     } catch (err: any) {
       console.error('Gate Sign In Error:', err);
       const friendlyMsg = getAuthErrorMessage(err);
       setErrorMsg(friendlyMsg);
-      setFallbackUserPrompt({ email: email.trim(), name: name.trim() || undefined });
     } finally {
       setIsProcessing(false);
     }
@@ -121,7 +120,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     setIsProcessing(true);
     setErrorMsg(null);
     setSuccessMsg(null);
-    setFallbackUserPrompt(null);
 
     if (password.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
@@ -145,17 +143,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
       onLoginSuccess(appUser);
     } catch (err: any) {
       console.error('Gate Sign Up Error:', err);
-      // If Firebase Auth provider is blocked or disabled, seamlessly create direct user
-      if (
-        err?.code === 'auth/operation-not-allowed' ||
-        err?.code === 'auth/admin-restricted-operation'
-      ) {
-        const directUser = createDirectSessionUser(email, name, undefined, adminList);
-        onLoginSuccess(directUser);
-        return;
-      }
       setErrorMsg(getAuthErrorMessage(err));
-      setFallbackUserPrompt({ email: email.trim(), name: name.trim() });
     } finally {
       setIsProcessing(false);
     }
@@ -178,26 +166,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     } catch (err: any) {
       console.error('Gate Reset Error:', err);
       setErrorMsg(getAuthErrorMessage(err));
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Google OAuth handler with fallback
-  const handleGoogleSignIn = async () => {
-    setIsProcessing(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setFallbackUserPrompt(null);
-
-    try {
-      const firebaseUser = await signInWithGooglePopup();
-      const appUser = formatFirebaseUser(firebaseUser, adminList);
-      onLoginSuccess(appUser);
-    } catch (err: any) {
-      console.warn('Gate Google Error, offering fallback:', err);
-      // If popup fails or iframe blocks it, fall back to owner email
-      handleQuickLogin(PRIMARY_OWNER_EMAIL, 'bigteggs26 (Super Admin)', 'admin');
     } finally {
       setIsProcessing(false);
     }
@@ -231,8 +199,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({
             {mode === 'forgot' && 'Reset Account Password'}
           </h2>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            {mode === 'signin' && 'Sign in with your email & password, Google, or 1-Click Quick Access.'}
-            {mode === 'signup' && 'Set up your credentials with automatic email verification.'}
+            {mode === 'signin' && 'Sign in with your Google account or email & password.'}
+            {mode === 'signup' && 'Create your account with Google or email credentials.'}
             {mode === 'forgot' && 'Enter your email to receive recovery instructions.'}
           </p>
         </div>
@@ -241,44 +209,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-6 px-6 shadow-sm border border-slate-200 rounded-3xl sm:px-8 space-y-4">
           
-          {/* Quick 1-Click Access for Owner */}
-          <div className="bg-gradient-to-r from-indigo-50/80 via-slate-50 to-emerald-50/80 p-3 rounded-2xl border border-indigo-100">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-900 flex items-center justify-between mb-2">
-              <span className="flex items-center gap-1.5">
-                <Zap size={13} className="text-amber-500 fill-amber-500" />
-                <span>Super Admin Quick Sign-In</span>
-              </span>
-              <span className="text-[10px] text-indigo-700 font-bold bg-indigo-100 px-1.5 py-0.2 rounded">
-                Owner
-              </span>
-            </div>
-            <button
-              type="button"
-              id="quick-login-owner"
-              onClick={() => handleQuickLogin(PRIMARY_OWNER_EMAIL, 'bigteggs26 (Super Admin)', 'admin')}
-              className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 hover:border-indigo-500 hover:shadow-xs transition-all text-left flex items-center justify-between group"
-              title="Sign in as Super Admin (bigteggs26@gmail.com)"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
-                  <Crown size={15} className="text-amber-500" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
-                    <span>bigteggs26</span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 font-bold uppercase tracking-wider">
-                      Super Admin
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">{PRIMARY_OWNER_EMAIL}</div>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-indigo-600 group-hover:translate-x-0.5 transition-transform">
-                Sign In →
-              </span>
-            </button>
-          </div>
-
           {/* Mode Switcher */}
           {mode !== 'forgot' && (
             <div className="grid grid-cols-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
@@ -289,7 +219,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                   setMode('signin');
                   setErrorMsg(null);
                   setSuccessMsg(null);
-                  setFallbackUserPrompt(null);
                 }}
                 className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'signin'
@@ -307,7 +236,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                   setMode('signup');
                   setErrorMsg(null);
                   setSuccessMsg(null);
-                  setFallbackUserPrompt(null);
                 }}
                 className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'signup'
@@ -321,25 +249,41 @@ export const AuthGate: React.FC<AuthGateProps> = ({
             </div>
           )}
 
+          {/* Google Sign In / Sign Up Button */}
+          {mode !== 'forgot' && (
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                id="gate-google-auth-btn"
+                onClick={handleGoogleAuth}
+                disabled={isProcessing}
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 hover:border-slate-400 font-bold text-xs rounded-2xl shadow-xs transition-all flex items-center justify-center gap-3 disabled:opacity-60 cursor-pointer"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>
+                  {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
+                </span>
+              </button>
+
+              <div className="relative flex items-center justify-center my-2">
+                <div className="border-t border-slate-200 w-full" />
+                <span className="bg-white px-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider absolute">
+                  or continue with email
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Feedback banners */}
           {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 font-medium leading-relaxed space-y-2">
-              <div className="flex items-start gap-2">
-                <AlertCircle size={15} className="shrink-0 text-rose-600 mt-0.5" />
-                <span>{errorMsg}</span>
-              </div>
-              {fallbackUserPrompt && (
-                <div className="pt-1.5 border-t border-rose-200/80 flex items-center justify-between">
-                  <span className="text-[11px] text-rose-900">Want to bypass and enter now?</span>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin(fallbackUserPrompt.email, fallbackUserPrompt.name || 'Developer')}
-                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-colors"
-                  >
-                    Instant Enter →
-                  </button>
-                </div>
-              )}
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 font-medium leading-relaxed flex items-start gap-2">
+              <AlertCircle size={15} className="shrink-0 text-rose-600 mt-0.5" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
@@ -365,7 +309,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. bigteggs26@gmail.com"
+                    placeholder="e.g. admin@codescore.dev or user@company.com"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
@@ -457,7 +401,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. bigteggs26"
+                    placeholder="e.g. Alex Morgan"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
@@ -590,50 +534,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                 </button>
               </div>
             </form>
-          )}
-
-          {/* Google Sign In option */}
-          {mode !== 'forgot' && (
-            <>
-              <div className="relative my-3">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-white text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    Or One-Click Google Login
-                  </span>
-                </div>
-              </div>
-
-              <button
-                id="auth-gate-google-btn"
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isProcessing}
-                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 border border-slate-300 rounded-2xl shadow-2xs bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all hover:border-slate-400 active:scale-[0.99] disabled:opacity-50"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Continue with Google Account</span>
-              </button>
-            </>
           )}
 
           {/* Account Security Notice */}

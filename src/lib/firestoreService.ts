@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Submission, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, DEFAULT_ADMIN_LIST } from '../utils/googleAuth';
+import { PRIMARY_OWNER_EMAIL, DEFAULT_ADMIN_LIST } from '../utils/authConfig';
 import { PRIMARY_OWNER_USER } from '../data/initialData';
 
 const USERS_COLLECTION = 'users';
@@ -194,3 +194,35 @@ export async function clearAllUsersFromCloud(preserveUser: User): Promise<void> 
 
   await batch.commit();
 }
+
+/**
+ * Purge ALL users from cloud database completely (including owner)
+ */
+export async function purgeAllUsersFromCloud(): Promise<void> {
+  const usersRef = collection(db, USERS_COLLECTION);
+  const snapshot = await getDocs(usersRef);
+  const batch = writeBatch(db);
+
+  snapshot.forEach((docSnap) => {
+    batch.delete(docSnap.ref);
+  });
+
+  await batch.commit();
+}
+
+/**
+ * Total reset: purges every user and submission in cloud Firestore
+ */
+export async function wipeAllCloudData(): Promise<void> {
+  const usersRef = collection(db, USERS_COLLECTION);
+  const subsRef = collection(db, SUBMISSIONS_COLLECTION);
+  
+  const [userSnap, subSnap] = await Promise.all([getDocs(usersRef), getDocs(subsRef)]);
+  const batch = writeBatch(db);
+
+  userSnap.forEach((docSnap) => batch.delete(docSnap.ref));
+  subSnap.forEach((docSnap) => batch.delete(docSnap.ref));
+
+  await batch.commit();
+}
+

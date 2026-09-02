@@ -2,14 +2,14 @@ import { User, Submission, ProgrammingLanguage } from '../types';
 
 export const PRIMARY_OWNER_USER: User = {
   id: 'user-owner',
-  name: 'bigteggs26',
-  email: 'bigteggs26@gmail.com',
+  name: 'Lead Admin',
+  email: 'admin@codescore.dev',
   role: 'admin',
   isSuperAdmin: true,
-  avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=bigteggs26@gmail.com&backgroundColor=b6e3f4,c0aede,d1d4f9',
+  avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin@codescore.dev&backgroundColor=b6e3f4,c0aede,d1d4f9',
   title: 'Lead Administrator & Reviewer',
   badge: 'Super Admin',
-  authProvider: 'google',
+  authProvider: 'password',
 };
 
 // Initial users array containing only the primary Super Admin account

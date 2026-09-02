@@ -16,7 +16,7 @@ import {
   Award
 } from 'lucide-react';
 import { User, AdminEntry } from '../types';
-import { PRIMARY_OWNER_EMAIL, getAvatarUrl } from '../utils/googleAuth';
+import { PRIMARY_OWNER_EMAIL, getAvatarUrl } from '../utils/authConfig';
 
 interface AdminManagementModalProps {
   currentUser: User;
@@ -28,6 +28,7 @@ interface AdminManagementModalProps {
   onDeleteUser: (userId: string) => void;
   onToggleUserRole: (userId: string, newRole: 'admin' | 'member') => void;
   onRemoveAllUsers: (preserveCurrentUser: boolean) => void;
+  onWipeEverything?: () => void;
   onAddTeamMember: (member: Omit<User, 'id'>) => void;
 }
 
@@ -41,6 +42,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   onDeleteUser,
   onToggleUserRole,
   onRemoveAllUsers,
+  onWipeEverything,
   onAddTeamMember,
 }) => {
   const [activeTab, setActiveTab] = useState<'admins' | 'users' | 'add_member' | 'danger_zone'>('admins');
@@ -60,7 +62,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
   // Confirmation state for "Remove All Users"
   const [confirmWipeModal, setConfirmWipeModal] = useState(false);
+  const [confirmTotalWipeModal, setConfirmTotalWipeModal] = useState(false);
   const [wipeConfirmText, setWipeConfirmText] = useState('');
+  const [totalWipeConfirmText, setTotalWipeConfirmText] = useState('');
 
   const isSuperAdmin =
     currentUser.isSuperAdmin ||
@@ -108,6 +112,18 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       onRemoveAllUsers(true);
       setConfirmWipeModal(false);
       setWipeConfirmText('');
+    }
+  };
+
+  const handleConfirmTotalWipe = () => {
+    if (totalWipeConfirmText.toLowerCase() === 'clear everything') {
+      if (onWipeEverything) {
+        onWipeEverything();
+      } else {
+        onRemoveAllUsers(false);
+      }
+      setConfirmTotalWipeModal(false);
+      setTotalWipeConfirmText('');
     }
   };
 
@@ -212,7 +228,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     Authorize New Administrator
                   </h4>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    Authorized Google accounts will immediately have full Admin review, rubric grading, and management access upon signing in.
+                    Authorized admin accounts will immediately have full Admin review, rubric grading, and management access upon signing in.
                   </p>
                 </div>
 
@@ -226,14 +242,14 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 <form onSubmit={handleAddAdminSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Admin Google Email *
+                      Admin Email *
                     </label>
                     <input
                       type="email"
                       required
                       value={newAdminEmail}
                       onChange={(e) => setNewAdminEmail(e.target.value)}
-                      placeholder="e.g. colleague@gmail.com"
+                      placeholder="e.g. colleague@company.com"
                       className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 font-medium"
                     />
                   </div>
@@ -564,20 +580,33 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   What happens when you click "Remove All Users":
                 </p>
                 <ul className="text-xs text-slate-600 list-disc list-inside space-y-1">
-                  <li>All non-owner member accounts are permanently removed.</li>
+                  <li>All non-owner member accounts and test users are permanently deleted.</li>
                   <li>Your Administrator account (<strong className="text-indigo-700">{PRIMARY_OWNER_EMAIL}</strong>) is preserved as the sole Super Admin.</li>
-                  <li>You can then add your real developers and colleagues cleanly via the Add Member tab or Google Sign In.</li>
+                  <li>You can always reclaim or verify Super Admin status instantly on any device by entering the master admin code: <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">ADMIN777</code> or <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">ROOT999</code>.</li>
+                  <li>You can then add your real developers and colleagues cleanly via the Add Member tab or the Sign Up portal.</li>
                 </ul>
 
-                <button
-                  type="button"
-                  id="trigger-remove-all-users-btn"
-                  onClick={() => setConfirmWipeModal(true)}
-                  className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
-                >
-                  <Trash2 size={16} />
-                  <span>Purge Users & Keep Only Super Admin</span>
-                </button>
+                <div className="pt-3 border-t border-rose-100 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    id="trigger-remove-all-users-btn"
+                    onClick={() => setConfirmWipeModal(true)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={15} />
+                    <span>Option A: Purge Non-Owner Users (Keep My Super Admin)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="trigger-total-wipe-all-btn"
+                    onClick={() => setConfirmTotalWipeModal(true)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
+                  >
+                    <AlertTriangle size={15} />
+                    <span>Option B: Purge ALL Accounts (Including Mine)</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -595,7 +624,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Modal for Wipe All Users */}
+      {/* Confirmation Modal for Wipe Non-Owner Users */}
       {confirmWipeModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-rose-200 animate-in zoom-in-95 duration-150">
@@ -604,7 +633,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 <AlertTriangle size={24} />
               </div>
               <h3 className="text-base font-extrabold text-slate-900">
-                Confirm Purge All Users
+                Confirm Purge Non-Owner Users
               </h3>
             </div>
 
@@ -643,7 +672,65 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 onClick={handleConfirmWipe}
                 className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors disabled:opacity-40"
               >
-                Confirm & Wipe Users
+                Confirm & Wipe
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for TOTAL Wipe (Including Owner) */}
+      {confirmTotalWipeModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-rose-300 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Total Wipe (Clear All Accounts)
+                </h3>
+                <p className="text-xs text-rose-600 font-medium">Includes your account and all members</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              This will completely wipe all registered users from the Firestore database. You can instantly restore your Super Admin status afterwards anytime by entering the master admin code <strong className="text-indigo-600 font-mono">ADMIN777</strong> or <strong className="text-indigo-600 font-mono">ROOT999</strong>.
+            </p>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Type <span className="font-mono text-rose-600 font-black">clear everything</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={totalWipeConfirmText}
+                onChange={(e) => setTotalWipeConfirmText(e.target.value)}
+                placeholder="clear everything"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-rose-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmTotalWipeModal(false);
+                  setTotalWipeConfirmText('');
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-total-wipe-execute-btn"
+                disabled={totalWipeConfirmText.toLowerCase() !== 'clear everything'}
+                onClick={handleConfirmTotalWipe}
+                className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors disabled:opacity-40"
+              >
+                Clear Everything
               </button>
             </div>
           </div>

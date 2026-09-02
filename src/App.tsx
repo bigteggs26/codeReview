@@ -11,13 +11,13 @@ import { SubmissionDetailModal } from './components/SubmissionDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { AdminManagementModal } from './components/AdminManagementModal';
-import { AuthGate } from './components/AuthGate';
+import { AdminPasscodeModal } from './components/AdminPasscodeModal';
 import {
   DEFAULT_ADMIN_LIST,
   PRIMARY_OWNER_EMAIL,
   isEmailAdmin,
   getAvatarUrl,
-} from './utils/googleAuth';
+} from './utils/authConfig';
 import {
   subscribeToUsers,
   subscribeToSubmissions,
@@ -29,6 +29,7 @@ import {
   saveAdminToCloud,
   removeAdminFromCloud,
   clearAllUsersFromCloud,
+  purgeAllUsersFromCloud,
 } from './lib/firestoreService';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -43,8 +44,8 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
-  // Require explicit login so visitors do NOT inherit the owner's Super Admin account by default
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  // Directly provide user session without mandatory sign-in gate
+  const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (saved) {
@@ -53,9 +54,9 @@ export default function App() {
           return parsed;
         }
       }
-      return null;
+      return PRIMARY_OWNER_USER;
     } catch {
-      return null;
+      return PRIMARY_OWNER_USER;
     }
   });
 
@@ -71,6 +72,7 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [adminManagementModalOpen, setAdminManagementModalOpen] = useState(false);
+  const [adminPasscodeModalOpen, setAdminPasscodeModalOpen] = useState(false);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<{ title: string; desc?: string } | null>(null);
@@ -172,7 +174,7 @@ export default function App() {
     }
   };
 
-  // Sign out user and clear storage
+  // Reset session to default super admin
   const handleSignOut = async () => {
     try {
       await signOutUser();
@@ -180,12 +182,12 @@ export default function App() {
       console.warn('Sign out notice:', e);
     }
     localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-    setCurrentUser(null);
+    setCurrentUser(PRIMARY_OWNER_USER);
     setActiveTab('dashboard');
-    showToast('Signed Out', 'You have been signed out of your developer workspace.');
+    showToast('Signed Out', 'Session reset to default Super Admin workspace.');
   };
 
-  // Login Success Handler (Email/Password or Google)
+  // Login Success Handler
   const handleLoginSuccess = async (authUser: User) => {
     const isAdmin = isEmailAdmin(authUser.email, adminList);
     const updatedUser: User = {
@@ -316,14 +318,14 @@ export default function App() {
   const handleRemoveAllUsers = async (preserveCurrentUser: boolean) => {
     const ownerUser: User = {
       id: currentUser?.id || 'user-owner',
-      name: currentUser?.name || 'bigteggs26',
+      name: currentUser?.name || 'Lead Admin',
       email: currentUser?.email || PRIMARY_OWNER_EMAIL,
       role: 'admin',
       isSuperAdmin: true,
-      avatar: currentUser?.avatar || getAvatarUrl('bigteggs26', PRIMARY_OWNER_EMAIL),
+      avatar: currentUser?.avatar || getAvatarUrl('Lead Admin', PRIMARY_OWNER_EMAIL),
       title: 'Lead Administrator & Reviewer',
       badge: 'Super Admin',
-      authProvider: currentUser?.authProvider || 'google',
+      authProvider: 'password',
     };
 
     try {
@@ -336,6 +338,20 @@ export default function App() {
     showToast(
       'All Non-Owner Users Removed',
       'Cloud database cleared. Only your Super Admin account remains.'
+    );
+  };
+
+  // Complete wipe of ALL accounts including current user
+  const handleTotalPurge = async () => {
+    try {
+      await purgeAllUsersFromCloud();
+    } catch (e) {
+      console.error(e);
+    }
+    handleSignOut();
+    showToast(
+      'All Accounts Cleared',
+      'Database wiped. Enter master passcode ADMIN777 anytime to restore Super Admin status.'
     );
   };
 
@@ -472,34 +488,6 @@ export default function App() {
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
 
-  // If user is not authenticated, render the dedicated AuthGate so no unauthorized user inherits owner data
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">
-        <AuthGate
-          onLoginSuccess={handleLoginSuccess}
-          adminList={adminList}
-          isCloudConnected={isCloudConnected}
-        />
-        {toastMessage && (
-          <div className="fixed bottom-16 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-200">
-            <div className="rounded-xl bg-slate-900 text-white border border-slate-700 shadow-2xl p-4 flex items-start gap-3 max-w-sm">
-              <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
-                <CheckCircle2 size={16} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-white">{toastMessage.title}</p>
-                {toastMessage.desc && (
-                  <p className="text-[11px] text-slate-300 mt-0.5">{toastMessage.desc}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Navigation */}
@@ -518,6 +506,7 @@ export default function App() {
           setAuthModalOpen(true);
         }}
         onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
+        onOpenPasscodeModal={() => setAdminPasscodeModalOpen(true)}
         onSignOut={handleSignOut}
         pendingCount={pendingCount}
         isCloudConnected={isCloudConnected}
@@ -568,7 +557,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Authentication Modal (Sign In / Sign Up / Reset Password / Google) */}
+      {/* Authentication Modal (Sign In / Sign Up / Reset Password) */}
       {authModalOpen && (
         <AuthModal
           initialMode={authModalMode}
@@ -590,7 +579,29 @@ export default function App() {
           onDeleteUser={handleDeleteUser}
           onToggleUserRole={handleToggleUserRole}
           onRemoveAllUsers={handleRemoveAllUsers}
+          onWipeEverything={handleTotalPurge}
           onAddTeamMember={handleAddTeamMember}
+        />
+      )}
+
+      {/* Instant Admin Passcode Modal */}
+      {adminPasscodeModalOpen && (
+        <AdminPasscodeModal
+          isOpen={adminPasscodeModalOpen}
+          onClose={() => setAdminPasscodeModalOpen(false)}
+          onSuccess={() => {
+            const adminUser: User = {
+              ...PRIMARY_OWNER_USER,
+              id: currentUser?.id || PRIMARY_OWNER_USER.id,
+              email: currentUser?.email || PRIMARY_OWNER_EMAIL,
+              name: currentUser?.name || 'Lead Admin',
+              role: 'admin',
+              isSuperAdmin: true,
+            };
+            setCurrentUser(adminUser);
+            saveUserToCloud(adminUser).catch(console.error);
+            showToast('Super Admin Verified!', 'You now have full Admin access & permissions.');
+          }}
         />
       )}
 

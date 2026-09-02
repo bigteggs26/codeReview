@@ -19,8 +19,8 @@ export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = (
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
-  // If already verified or Google authenticated, don't show the banner
-  if (currentUser.emailVerified || currentUser.authProvider === 'google') {
+  // If already verified, don't show the banner
+  if (currentUser.emailVerified) {
     return null;
   }
 
@@ -59,9 +59,9 @@ export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = (
     setIsChecking(true);
     setMessage(null);
     try {
-      const refreshedFirebaseUser進 = await refreshCurrentUser();
-      if (refreshedFirebaseUser進 && refreshedFirebaseUser進.emailVerified) {
-        const updated = formatFirebaseUser(refreshedFirebaseUser進);
+      const refreshedUser = await refreshCurrentUser();
+      if (refreshedUser && refreshedUser.emailVerified) {
+        const updated = formatFirebaseUser(refreshedUser);
         onUserUpdated(updated);
         setMessage({
           type: 'success',
